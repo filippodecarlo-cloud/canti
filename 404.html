@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>Canti</title>
+<script>
+  // GitHub Pages mostra questa pagina per ogni indirizzo inesistente, come /canti/<chiave>:
+  // la parte dopo il nome del sito è la chiave di lettura e viene passata all'app.
+  (function () {
+    var parti = location.pathname.split("/").filter(Boolean);
+    var base = "/" + (parti[0] || "") + "/";
+    var chiave = parti[1] || "";
+    location.replace(/^[A-Za-z0-9-]+$/.test(chiave) && chiave !== "index.html" ? base + "#k=" + chiave.toLowerCase() : base);
+  })();
+</script>
+</head>
+<body></body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chi canta prega due volte</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#a8261c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone/icona-192.png">
+<link rel="apple-touch-icon" href="icone/apple-touch-icon.png">
+<link rel="stylesheet" href="stile.css">
+</head>
+<body>
+<aside id="elenco">
+  <header class="elenco-testa">
+    <div class="elenco-titolo">
+      <h1>Chi canta prega due volte</h1>
+      <button id="nuovo-canto" class="solo-online" title="Aggiungi un canto (serve la password)">+ Canto</button>
+    </div>
+    <input id="cerca" type="search" placeholder="Cerca titolo o parole…" autocomplete="off" aria-label="Cerca un canto">
+    <div id="filtri" class="filtri" aria-label="Filtra per tag"></div>
+    <p id="conteggio"></p>
+  </header>
+  <ul id="risultati"></ul>
+  <button id="esporta-tag" class="esporta" hidden title="Scarica tag.json con i tag cambiati nell’app">Esporta i tag modificati</button>
+</aside>
+
+<main id="canto">
+  <div id="vuoto" class="vuoto">
+    <p>Scegli un canto dall’elenco<br>oppure cerca per titolo o per parole del testo.</p>
+  </div>
+  <article id="foglio" hidden>
+    <nav class="barra">
+      <button id="indietro" class="solo-mobile" title="Torna all’elenco" aria-label="Torna all’elenco">‹ Elenco</button>
+      <div class="gruppo" role="group" aria-label="Trasposizione">
+        <button id="giu" title="Abbassa di un semitono (tasto −)">−</button>
+        <span id="tonalita" class="tonalita"></span>
+        <button id="su" title="Alza di un semitono (tasto +)">+</button>
+        <button id="azzera" title="Tonalità originale">↺</button>
+      </div>
+      <div class="gruppo" role="group" aria-label="Dimensione testo">
+        <button id="piccolo" title="Testo più piccolo">A−</button>
+        <button id="grande" title="Testo più grande">A+</button>
+      </div>
+      <div class="gruppo">
+        <button id="accordi" aria-pressed="true" title="Mostra o nascondi gli accordi">Accordi</button>
+        <button id="notazione" title="Notazione italiana o internazionale">Do / C</button>
+        <button id="modifica-canto" class="solo-online" title="Modifica il canto (serve la password)">✎ Modifica</button>
+        <select id="tema" title="Colori" aria-label="Colori">
+          <option value="">Colori automatici</option>
+          <option value="light">Carta</option>
+          <option value="classic">Classico</option>
+          <option value="dark">Scuro</option>
+        </select>
+      </div>
+    </nav>
+    <section id="pannello-modifica" class="pannello-modifica" hidden>
+      <p class="pm-aiuto"><b>Modifica del canto.</b> Accordi tra quadre subito prima della sillaba (<code>[La]Santo</code>);
+        ritornello tra <code>{start_of_chorus}</code> e <code>{end_of_chorus}</code>. L’anteprima è qui sotto.</p>
+      <textarea id="pm-testo" spellcheck="false" autocapitalize="off" aria-label="Testo del canto"></textarea>
+      <div class="editor-comandi">
+        <button id="pm-salva" class="primario">Salva online</button>
+        <button id="pm-annulla">Annulla</button>
+        <button id="pm-elimina" class="pericolo">Elimina canto</button>
+      </div>
+    </section>
+    <header class="intestazione">
+      <h2 id="titolo"></h2>
+      <p id="sottotitolo"></p>
+      <p class="info">
+        <span id="autore"></span>
+        <span id="tempo-canto"></span>
+        <a id="youtube" target="_blank" rel="noopener" hidden>▶ Ascolta su YouTube</a>
+      </p>
+      <div id="tag-canto" class="tag-canto"></div>
+    </header>
+    <div id="corpo"></div>
+    <div id="scorri" class="scorri" role="group" aria-label="Scorrimento automatico">
+      <button id="scorri-lento" title="Più lento" aria-label="Più lento">−</button>
+      <button id="scorri-via">▶</button>
+      <span id="scorri-vel" title="Velocità di scorrimento"></span>
+      <button id="scorri-veloce" title="Più veloce" aria-label="Più veloce">+</button>
+    </div>
+  </article>
+</main>
+
+<section id="blocco" class="blocco-chiave" hidden>
+  <div>
+    <h1>Chi canta prega due volte</h1>
+    <p id="blocco-msg"></p>
+    <form id="blocco-form">
+      <input id="blocco-input" placeholder="Incolla qui il link o la chiave" autocapitalize="off" autocomplete="off" spellcheck="false">
+      <button>Apri</button>
+    </form>
+  </div>
+</section>
+<dialog id="finestra"></dialog>
+<div id="avviso" class="avviso" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.4/dist/abcjs-basic-min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

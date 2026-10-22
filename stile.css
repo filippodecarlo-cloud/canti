@@ -1,0 +1,270 @@
+:root {
+  --carta: #fbf8f3;
+  --pannello: #f3eee5;
+  --inchiostro: #23201c;
+  --tenue: #6f675c;
+  --linea: #e2dace;
+  --rubrica: #a8261c;       /* il rosso delle rubriche liturgiche, per gli accordi */
+  --rit-fondo: #f6eee4;
+  --evidenzia: #f4d58d;
+  --dim: 19px;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --carta: #1b1a18; --pannello: #232120; --inchiostro: #ece6dc; --tenue: #a39a8c;
+    --linea: #34312d; --rubrica: #f08a7a; --rit-fondo: #26221f; --evidenzia: #6b5420;
+    color-scheme: dark;
+  }
+}
+/* classico: bianco, testo nero, accordi rossi */
+:root[data-theme="classic"] {
+  --carta: #ffffff; --pannello: #f5f5f5; --inchiostro: #000000; --tenue: #555555;
+  --linea: #dddddd; --rubrica: #d40000; --rit-fondo: #f7f7f7; --evidenzia: #ffe680;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --carta: #1b1a18; --pannello: #232120; --inchiostro: #ece6dc; --tenue: #a39a8c;
+  --linea: #34312d; --rubrica: #f08a7a; --rit-fondo: #26221f; --evidenzia: #6b5420;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  background: var(--carta);
+  color: var(--inchiostro);
+  font-family: var(--sans);
+}
+button {
+  font: inherit; font-size: 15px; color: inherit;
+  background: var(--carta); border: 1px solid var(--linea); border-radius: 8px;
+  padding: 6px 11px; cursor: pointer; min-height: 36px;
+}
+button:hover { border-color: var(--tenue); }
+.barra select, .editor select, .editor input {
+  font: inherit; font-size: 14px; color: inherit; background: var(--carta);
+  border: 1px solid var(--linea); border-radius: 8px; padding: 6px 8px; min-height: 36px;
+}
+button[aria-pressed="false"] { color: var(--tenue); text-decoration: line-through; }
+
+/* --- elenco ------------------------------------------------------------ */
+#elenco {
+  background: var(--pannello); border-right: 1px solid var(--linea);
+  height: 100vh; overflow-y: auto; position: sticky; top: 0;
+}
+.elenco-testa { position: sticky; top: 0; background: var(--pannello); padding: 18px 16px 8px; z-index: 1; }
+.elenco-testa h1 { font-family: var(--serif); font-weight: 600; font-size: 21px; margin: 0 0 12px; }
+#cerca {
+  width: 100%; font: inherit; font-size: 16px; padding: 10px 12px;
+  border: 1px solid var(--linea); border-radius: 10px; background: var(--carta); color: inherit;
+}
+#cerca:focus { outline: 2px solid var(--rubrica); outline-offset: -1px; }
+#conteggio { color: var(--tenue); font-size: 13px; margin: 8px 2px 0; }
+#risultati { list-style: none; margin: 0; padding: 0 8px 24px; }
+#risultati a {
+  display: block; padding: 9px 10px; border-radius: 8px;
+  color: inherit; text-decoration: none;
+}
+#risultati a:hover { background: var(--carta); }
+#risultati a[aria-current="page"] { background: var(--carta); box-shadow: inset 3px 0 0 var(--rubrica); }
+.r-titolo { font-family: var(--serif); font-size: 17px; }
+.r-dettaglio { display: block; color: var(--tenue); font-size: 13px; margin-top: 2px; }
+mark { background: var(--evidenzia); color: inherit; border-radius: 2px; }
+
+/* --- foglio del canto ------------------------------------------------- */
+#canto { min-width: 0; }
+.vuoto { display: grid; place-items: center; height: 100vh; color: var(--tenue); text-align: center; line-height: 1.6; }
+#foglio { max-width: 860px; margin: 0 auto; padding: 0 28px 80px; }
+.barra {
+  position: sticky; top: 0; z-index: 2; background: var(--carta);
+  display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+  padding: 12px 0; border-bottom: 1px solid var(--linea);
+}
+.gruppo { display: flex; gap: 4px; align-items: center; }
+.tonalita { min-width: 112px; text-align: center; font-size: 14px; color: var(--tenue); }
+.tonalita b { color: var(--rubrica); font-size: 16px; }
+.solo-mobile { display: none; }
+.intestazione { padding: 26px 0 6px; }
+#titolo { font-family: var(--serif); font-weight: 600; font-size: 34px; margin: 0; line-height: 1.15; }
+#sottotitolo { color: var(--tenue); margin: 6px 0 0; font-style: italic; }
+#sottotitolo:empty { display: none; }
+.info { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 0; font-size: 14px; color: var(--tenue); }
+.info span:empty { display: none; }
+#autore { font-weight: 600; color: var(--inchiostro); }
+#youtube { color: var(--rubrica); text-decoration: none; font-weight: 600; }
+#youtube:hover { text-decoration: underline; }
+
+/* --- tag ---------------------------------------------------------------- */
+.chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: 13px; min-height: 28px; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--linea); background: var(--carta); color: var(--inchiostro);
+}
+.chip small { color: var(--tenue); font-size: 11px; }
+.chip-x { border: 0; background: none; min-height: 0; padding: 0 0 0 4px; color: var(--tenue); font-size: 15px; line-height: 1; }
+.chip-x:hover { color: var(--rubrica); }
+.chip-nuovo { color: var(--tenue); border-style: dashed; cursor: pointer; }
+.chip-input { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rubrica); background: var(--carta); color: inherit; width: 140px; }
+.tag-canto { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.filtri { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; max-height: 96px; overflow-y: auto; }
+.filtri:empty { display: none; }
+.filtro { cursor: pointer; }
+.filtro[aria-pressed="true"] { background: var(--rubrica); border-color: var(--rubrica); color: var(--carta); text-decoration: none; }
+.filtro[aria-pressed="true"] small { color: inherit; opacity: .8; }
+.filtro[aria-pressed="false"] { text-decoration: none; color: var(--inchiostro); }
+.esporta { margin: 0 16px 24px; font-size: 13px; }
+
+#corpo { font-family: var(--serif); font-size: var(--dim); line-height: 1.35; }
+.blocco { margin: 1.1em 0; }
+.ritornello { background: var(--rit-fondo); border-left: 3px solid var(--rubrica); padding: .5em 1em .6em; border-radius: 0 8px 8px 0; }
+.ponte { border-left: 3px dashed var(--linea); padding-left: 1em; }
+.etichetta {
+  font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--rubrica); margin-bottom: .3em;
+}
+.commento { font-family: var(--sans); font-size: .72em; font-style: italic; color: var(--tenue); margin: 1em 0 .2em; }
+
+/* riga: ogni parola è un blocco; ogni sillaba con accordo ha l'accordo sopra */
+.riga { display: flex; flex-wrap: wrap; align-items: flex-end; margin: 0 0 .25em; }
+.riga.senza-accordi { display: block; }
+.parola { display: inline-flex; align-items: flex-end; margin-right: .28em; white-space: pre; }
+.pezzo { display: inline-flex; flex-direction: column; align-items: flex-start; }
+.pezzo.trattino { align-items: stretch; }
+.acc {
+  font-family: var(--sans); font-weight: 700; font-size: .7em; color: var(--rubrica);
+  min-height: 1.35em; line-height: 1.35em; padding-right: .4em;
+}
+/* due accordi di fila sulla stessa sillaba: il primo resta in alto */
+.testo:empty::after { content: "\00a0"; }
+.solo-accordi .testo:empty::after { content: none; }
+.pezzo.trattino .testo { display: flex; }
+.pezzo.trattino .testo::after { content: "-"; flex: 1; text-align: center; color: var(--tenue); }
+.nascondi-accordi .acc { display: none; }
+.nascondi-accordi .pezzo.trattino .testo::after { content: none; }
+.nascondi-accordi .riga.solo-accordi,
+.nascondi-accordi .sequenza { display: none; }
+
+.sequenza { font-family: var(--sans); font-size: .82em; color: var(--tenue); margin: .6em 0; }
+.sequenza .acc { display: inline; font-size: 1em; padding-right: .7em; }
+
+.melodia { margin: 1em 0 1.4em; padding: .6em .9em; border: 1px solid var(--linea); border-radius: 10px; }
+.melodia-testa { display: flex; gap: 10px; align-items: center; font-family: var(--sans); font-size: 13px; color: var(--tenue); }
+.melodia-testa button { min-height: 30px; padding: 3px 10px; font-size: 13px; }
+.melodia-note { font-family: var(--sans); font-size: 14px; margin: .3em 0 0; letter-spacing: .02em; }
+.pentagramma { max-width: 560px; color: var(--inchiostro); }
+.pentagramma svg { color: var(--inchiostro); }
+.melodia-titolo { margin-right: auto; }
+.melodia-errori { color: var(--rubrica); font-family: var(--sans); font-size: 13px; margin: .3em 0 0; }
+.melodia-errori:empty, .melodia-note:empty { display: none; }
+.editor { margin-top: .8em; font-family: var(--sans); }
+.editor textarea {
+  width: 100%; font-family: ui-monospace, Consolas, monospace; font-size: 14px; line-height: 1.5;
+  padding: 10px; border-radius: 8px; border: 1px solid var(--linea); background: var(--carta); color: inherit; resize: vertical;
+}
+.editor textarea:focus { outline: 2px solid var(--rubrica); outline-offset: -1px; }
+.editor-aiuto { font-size: 12.5px; color: var(--tenue); line-height: 1.6; margin: .5em 0; }
+.editor-aiuto code { background: var(--pannello); padding: 0 4px; border-radius: 4px; color: var(--inchiostro); }
+.editor-comandi { display: flex; gap: 8px; }
+.editor-tempo { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; font-size: 14px; color: var(--tenue); }
+.editor-tempo label { display: flex; align-items: center; gap: 6px; }
+.editor-tempo input { width: 76px; }
+.editor-nota { font-size: 12.5px; color: var(--tenue); margin: .6em 0 0; }
+.aggiungi-melodia { margin-top: 2em; font-size: 14px; color: var(--tenue); border-style: dashed; }
+
+/* --- scorrimento automatico -------------------------------------------- */
+.scorri {
+  position: fixed; right: 16px; bottom: 16px; z-index: 3;
+  display: flex; align-items: center; gap: 4px; padding: 6px;
+  background: var(--pannello); border: 1px solid var(--linea); border-radius: 999px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / .12);
+}
+.scorri button { border-radius: 999px; min-width: 40px; min-height: 40px; padding: 0 10px; }
+.scorri #scorri-via { background: var(--rubrica); border-color: var(--rubrica); color: var(--carta); min-width: 48px; }
+#scorri-vel { min-width: 26px; text-align: center; font-size: 14px; font-weight: 600; color: var(--tenue); }
+.scorri.attivo #scorri-vel { color: var(--rubrica); }
+
+details.rit-rif { margin: .8em 0; }
+details.rit-rif summary {
+  cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--rubrica); list-style: none;
+}
+details.rit-rif summary::before { content: "↻ "; }
+details.rit-rif[open] summary { margin-bottom: .4em; }
+
+/* --- telefono ---------------------------------------------------------- */
+@media (max-width: 800px) {
+  body { display: block; }
+  #elenco { height: auto; min-height: 100vh; position: static; border-right: 0; }
+  body.con-canto #elenco { display: none; }
+  body:not(.con-canto) #canto { display: none; }
+  .solo-mobile { display: inline-block; }
+  #foglio { padding: 0 16px 60px; }
+  #titolo { font-size: 27px; }
+  .tonalita { min-width: 90px; }
+}
+
+@media print {
+  #elenco, .barra, .melodia-testa button, .scorri, .chip-nuovo, .chip-x, .aggiungi-melodia, #youtube { display: none !important; }
+  body { display: block; background: #fff; }
+  #foglio { max-width: none; padding: 0; }
+}
+
+/* --- online: chiave, modifiche, finestre -------------------------------- */
+.solo-online { display: none; }
+body.online .solo-online { display: inline-flex; align-items: center; }
+.elenco-titolo { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.elenco-titolo h1 { margin-bottom: 12px; }
+#nuovo-canto { font-size: 13px; min-height: 30px; padding: 3px 10px; white-space: nowrap; }
+button.primario { background: var(--rubrica); border-color: var(--rubrica); color: var(--carta); }
+button.pericolo { color: var(--rubrica); margin-left: auto; }
+
+.blocco-chiave {
+  position: fixed; inset: 0; z-index: 10; background: var(--carta);
+  display: grid; place-items: center; padding: 16px; text-align: center;
+}
+.blocco-chiave h1 { font-family: var(--serif); font-weight: 600; font-size: 28px; margin: 0 0 12px; }
+.blocco-chiave p { color: var(--tenue); }
+#blocco-form { display: flex; gap: 8px; max-width: 420px; margin: 16px auto 0; }
+#blocco-input {
+  flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 10px 12px;
+  border: 1px solid var(--linea); border-radius: 10px; background: var(--carta); color: inherit;
+}
+
+.pannello-modifica { margin: 16px 0 4px; padding: 12px; border: 1px solid var(--rubrica); border-radius: 10px; background: var(--pannello); }
+.pm-aiuto { margin: 0 0 8px; font-size: 13px; color: var(--tenue); line-height: 1.5; }
+.pm-aiuto code { background: var(--carta); padding: 0 4px; border-radius: 4px; color: var(--inchiostro); }
+#pm-testo {
+  width: 100%; min-height: 40vh; resize: vertical; margin-bottom: 8px;
+  font-family: ui-monospace, Consolas, monospace; font-size: 14px; line-height: 1.5;
+  padding: 10px; border-radius: 8px; border: 1px solid var(--linea); background: var(--carta); color: inherit;
+}
+body.in-modifica .scorri, body.in-modifica #modifica-canto { display: none; }
+
+dialog#finestra {
+  max-width: min(520px, calc(100vw - 32px)); border: 1px solid var(--linea); border-radius: 12px;
+  background: var(--carta); color: var(--inchiostro); padding: 20px; font-family: var(--sans);
+}
+dialog#finestra::backdrop { background: rgb(0 0 0 / .35); }
+dialog#finestra h3 { margin: 0 0 10px; font-family: var(--serif); font-size: 20px; }
+.finestra-testo { font-size: 14px; line-height: 1.55; color: var(--tenue); }
+.finestra-testo a { color: var(--rubrica); }
+.finestra-testo ol { padding-left: 20px; }
+.finestra-errore { color: var(--rubrica); font-size: 14px; font-weight: 600; }
+dialog#finestra label { display: block; font-size: 13px; color: var(--tenue); margin: 10px 0; }
+dialog#finestra input {
+  display: block; width: 100%; margin-top: 4px; font: inherit; font-size: 16px; padding: 8px 10px;
+  border: 1px solid var(--linea); border-radius: 8px; background: var(--carta); color: inherit;
+}
+dialog#finestra .editor-comandi { margin-top: 14px; }
+
+.avviso {
+  position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); z-index: 20;
+  max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: 10px;
+  background: var(--inchiostro); color: var(--carta); font-size: 14px; box-shadow: 0 4px 16px rgb(0 0 0 / .2);
+}
