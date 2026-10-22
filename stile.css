@@ -423,3 +423,7 @@ body.in-modifica #in-scaletta { display: none; }
 .naviga-scaletta.alfabetico #pos-scaletta { font-weight: 400; color: var(--tenue); font-size: 13px; }
 .naviga-scaletta.alfabetico button { min-height: 32px; font-size: 18px; }
 .barra button { white-space: nowrap; }
+
+/* editor: promemoria delle note, sempre visibile sotto il pentagramma */
+.pm-aiuto-note { font-size: 12.5px; line-height: 1.7; color: var(--tenue); margin: 0 0 8px; }
+.pm-aiuto-note code { background: var(--carta); padding: 0 4px; border-radius: 4px; color: var(--inchiostro); }
