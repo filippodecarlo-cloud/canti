@@ -406,3 +406,14 @@ body.in-modifica #corpo .melodia { display: none; }
 .pm-tonalita { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 14px; color: var(--tenue); }
 .pm-tonalita b { color: var(--rubrica); min-width: 90px; text-align: center; }
 .pm-tonalita button { min-height: 32px; padding: 2px 10px; font-size: 14px; }
+
+/* elenco scalette: ▶ per avviarle subito */
+.riga-scaletta { display: flex; align-items: center; gap: 4px; }
+.riga-scaletta .voce-scaletta { flex: 1; }
+.riga-scaletta .avvia { min-width: 40px; color: var(--rubrica); font-size: 16px; }
+.scalette .gruppo-nome { margin-top: 10px; }
+dialog#finestra select {
+  display: block; width: 100%; margin-top: 4px; font: inherit; font-size: 16px; padding: 8px 10px;
+  border: 1px solid var(--linea); border-radius: 8px; background: var(--carta); color: inherit;
+}
+body.in-modifica #in-scaletta { display: none; }

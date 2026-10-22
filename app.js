@@ -1119,31 +1119,50 @@ function finestra({ titolo, testo = "", campi = [], ok = "OK", errore = "" }) {
   return new Promise(risolvi => {
     const d = $("finestra");
     const form = el("form");
-    form.method = "dialog";
     form.append(el("h3", null, titolo));
     if (testo) { const p = el("div", "finestra-testo"); p.innerHTML = testo; form.append(p); }
     if (errore) form.append(el("p", "finestra-errore", errore));
     const valori = {};
     for (const c of campi) {
       const etichetta = el("label", null, c.etichetta);
-      const input = el("input");
-      Object.assign(input, { type: c.tipo || "text", autocomplete: "off", spellcheck: false, autocapitalize: "off" });
+      let input;
+      if (c.tipo === "select") {  // menu: c.opzioni = [[valore, testo], …]
+        input = el("select");
+        for (const [v, t] of c.opzioni) {
+          const o = el("option", null, t);
+          o.value = v;
+          input.append(o);
+        }
+      } else {
+        input = el("input");
+        Object.assign(input, { type: c.tipo || "text", autocomplete: "off", spellcheck: false, autocapitalize: "off" });
+      }
       valori[c.nome] = input;
       etichetta.append(input);
       form.append(etichetta);
     }
     const pulsanti = el("div", "editor-comandi");
     const si = el("button", "primario", ok);
-    si.value = "ok";
     const no = el("button", null, "Annulla");
     no.type = "button";
-    no.onclick = () => d.close("annulla");
     pulsanti.append(si, no);
     form.append(pulsanti);
     d.replaceChildren(form);
-    d.returnValue = "";
-    d.onclose = () => risolvi(d.returnValue === "ok"
-      ? Object.fromEntries(Object.entries(valori).map(([k, i]) => [k, i.value.trim()])) : null);
+    // si chiude dai pulsanti stessi, senza aspettare l'evento "close" (su alcuni browser non arriva)
+    let chiusa = false;
+    const chiudi = risposta => {
+      if (chiusa) return;
+      chiusa = true;
+      if (d.open) d.close();
+      risolvi(risposta);
+    };
+    form.onsubmit = e => {
+      e.preventDefault();
+      chiudi(Object.fromEntries(Object.entries(valori).map(([k, i]) => [k, i.value.trim()])));
+    };
+    no.onclick = () => chiudi(null);
+    d.oncancel = e => { e.preventDefault(); chiudi(null); };  // tasto Esc
+    d.onclose = () => chiudi(null);
     d.showModal();
     (Object.values(valori)[0] || si).focus();
   });
@@ -1556,14 +1575,59 @@ function disegnaScalette() {
   for (const s of SCALETTE) {
     const b = el("button", "voce-scaletta");
     b.append(el("span", "r-titolo", s.nome));
-    b.append(el("span", "r-dettaglio", [s.occasione, `${s.canti.length} ${s.canti.length === 1 ? "canto" : "canti"}`]
+    b.append(el("span", "r-dettaglio", [s.occasione, s.canti.length ? `${s.canti.length} ${s.canti.length === 1 ? "canto" : "canti"}` : "vuota"]
       .filter(Boolean).join(" · ")));
     b.onclick = () => { vista.aperta = s.id; disegnaScalette(); };
-    const li = el("li");
+    const li = el("li", "riga-scaletta");
     li.append(b);
+    if (s.canti.some(titoloDi)) {  // ▶ avvia subito dal primo canto
+      const via = el("button", "avvia", "▶");
+      via.title = "Inizia la scaletta";
+      via.onclick = () => iniziaScaletta(s);
+      li.append(via);
+    }
     ul.append(li);
   }
   box.append(ul);
+}
+
+/** "+ Scaletta" sulla pagina del canto: lo aggiunge in fondo a una scaletta (o a una nuova). */
+async function aggiungiAScaletta() {
+  const canto = stato.corrente;
+  if (!canto) return;
+  if (sito.attivo && !(await sbloccaModifiche())) return;
+  const opzioni = SCALETTE.map(s => [s.id, s.nome + (s.canti.includes(canto.id) ? " (c’è già)" : "")]);
+  opzioni.push(["", "+ Nuova scaletta…"]);
+  const v = await finestra({
+    titolo: `Aggiungi «${canto.meta.title}»`,
+    testo: "Il canto va in fondo alla scaletta; l’ordine si cambia con ✎ Modifica della scaletta.",
+    campi: [
+      { nome: "scaletta", etichetta: "Scaletta", tipo: "select", opzioni },
+      { nome: "nuova", etichetta: "Nome della nuova scaletta (solo se ne crei una)" },
+    ],
+    ok: "Aggiungi",
+  });
+  if (!v) return;
+  if (!v.scaletta && !v.nuova) { avviso("Scegli una scaletta o scrivi il nome di quella nuova"); return; }
+  const id = v.scaletta || "s" + Date.now().toString(36);
+  let nome = "";
+  const ok = await salvaScalette(l => {
+    let s = l.find(x => x.id === id);
+    if (!s) { s = { id, nome: v.nuova, occasione: "", canti: [] }; l.unshift(s); }
+    if (!s.canti.includes(canto.id)) s.canti.push(canto.id);
+    nome = s.nome;
+    return l;
+  }, `Scaletta: aggiunto ${canto.meta.title}`);
+  if (ok) {
+    avviso(`Aggiunto a «${nome}» ✓`);
+    aggiornaNavigazione();
+    if (vista.scheda === "scalette" && !vista.bozza) disegnaScalette();
+  }
+}
+
+function iniziaScaletta(s) {
+  entraInScaletta(s.id);
+  location.hash = "#/" + s.canti.find(titoloDi);
 }
 
 function disegnaScaletta(box, s) {
@@ -1586,11 +1650,13 @@ function disegnaScaletta(box, s) {
     }
     ol.append(li);
   });
-  box.append(ol);
+  if (s.canti.length) box.append(ol);
+  else box.append(el("p", "scalette-vuoto", "La scaletta è vuota. Aggiungi i canti con ✎ Modifica (cercandoli per " +
+    "titolo, parole o tag), oppure dalla pagina di un canto con il pulsante «+ Scaletta»."));
   const comandi = el("div", "editor-comandi");
   if (s.canti.some(titoloDi)) {
     const inizia = el("button", "primario", "▶ Inizia");
-    inizia.onclick = () => { entraInScaletta(s.id); location.hash = "#/" + s.canti.find(titoloDi); };
+    inizia.onclick = () => iniziaScaletta(s);
     comandi.append(inizia);
   }
   const modifica = el("button", null, "✎ Modifica");
@@ -1644,12 +1710,14 @@ function disegnaEditorScaletta(box) {
     li.append(su, giu, togli);
     ol.append(li);
   });
-  if (!b.canti.length) box.append(el("p", "scalette-vuoto", "Aggiungi i canti cercandoli qui sotto."));
+  box.append(el("div", "gruppo-nome", `Canti della scaletta (${b.canti.length})`));
+  if (!b.canti.length) box.append(el("p", "scalette-vuoto", "Ancora nessuno: cercali qui sotto e toccali per aggiungerli."));
   box.append(ol);
+  box.append(el("div", "gruppo-nome", "Aggiungi canti"));
 
   // aggiungere un canto: si cerca per titolo, parole o tag
   const cerca = el("input", "campo");
-  Object.assign(cerca, { type: "search", placeholder: "Aggiungi un canto: cerca titolo, parole o tag…" });
+  Object.assign(cerca, { type: "search", placeholder: "Cerca titolo, parole o tag e tocca il canto" });
   const proposte = el("ul", "proposte");
   cerca.oninput = () => {
     proposte.replaceChildren();
@@ -1803,6 +1871,7 @@ $("scheda-scalette").onclick = () => mostraScheda("scalette");
 $("prec-scaletta").onclick = () => vaiInScaletta(-1);
 $("succ-scaletta").onclick = () => vaiInScaletta(1);
 $("esci-scaletta").onclick = () => entraInScaletta(null);
+$("in-scaletta").onclick = aggiungiAScaletta;
 window.addEventListener("hashchange", apriDaIndirizzo);
 
 $("modifica-canto").onclick = () => modificaCanto(stato.corrente);
