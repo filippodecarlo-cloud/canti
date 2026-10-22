@@ -20,6 +20,11 @@
     </div>
     <p class="solo-locale avviso-locale">Copia sul PC: le modifiche online si fanno dal
       <a href="https://filippodecarlo-cloud.github.io/canti/" target="_blank" rel="noopener">sito</a>.</p>
+    <div class="schede" role="group" aria-label="Elenco">
+      <button id="scheda-canti" aria-pressed="true">Canti</button>
+      <button id="scheda-scalette" aria-pressed="false">Scalette</button>
+    </div>
+    <div id="testa-canti">
     <input id="cerca" type="search" placeholder="Cerca titolo o parole…" autocomplete="off" aria-label="Cerca un canto">
     <details id="pannello-filtri" class="pannello-filtri">
       <summary>Filtri <span id="filtri-attivi"></span></summary>
@@ -30,8 +35,10 @@
     <button id="azzera-filtri" class="azzera-filtri" hidden>× Togli i filtri</button>
     <div id="tag-suggeriti" class="tag-suggeriti"></div>
     <p id="conteggio"></p>
+    </div>
   </header>
   <ul id="risultati"></ul>
+  <section id="scalette" class="scalette" hidden></section>
   <button id="esporta-tag" class="esporta" hidden title="Scarica tag.json con i tag cambiati nell’app">Esporta i tag modificati</button>
 </aside>
 
@@ -47,6 +54,12 @@
   </div>
   <article id="foglio" hidden>
     <nav class="barra">
+      <div id="naviga-scaletta" class="naviga-scaletta" hidden>
+        <button id="prec-scaletta" title="Canto precedente della scaletta (freccia ←)" aria-label="Canto precedente">‹</button>
+        <span id="pos-scaletta"></span>
+        <button id="succ-scaletta" title="Canto successivo della scaletta (freccia →)" aria-label="Canto successivo">›</button>
+        <button id="esci-scaletta" class="esci" title="Esci dalla scaletta" aria-label="Esci dalla scaletta">×</button>
+      </div>
       <button id="indietro" class="solo-mobile" title="Torna all’elenco" aria-label="Torna all’elenco">‹ Elenco</button>
       <div class="gruppo" role="group" aria-label="Trasposizione">
         <button id="giu" title="Abbassa di un semitono (tasto −)">−</button>

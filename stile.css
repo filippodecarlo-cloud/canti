@@ -352,3 +352,52 @@ body.online .solo-locale { display: none; }
 body.in-modifica #corpo .melodia { display: none; }
 #pm-tempo .editor-tempo { margin: 0 0 8px; }
 #pm-tempo input { width: 76px; }
+
+/* --- scalette ------------------------------------------------------------ */
+.schede { display: flex; gap: 0; margin-bottom: 10px; border: 1px solid var(--linea); border-radius: 10px; overflow: hidden; }
+.schede button { flex: 1; border: 0; border-radius: 0; background: var(--carta); font-size: 14px; min-height: 34px; }
+.schede button[aria-pressed="true"] { background: var(--rubrica); color: var(--carta); text-decoration: none; font-weight: 600; }
+.schede button[aria-pressed="false"] { text-decoration: none; color: var(--inchiostro); }
+.scalette { padding: 4px 16px 24px; font-size: 14px; }
+.scalette > .primario { width: 100%; margin-bottom: 10px; }
+.scalette-vuoto { color: var(--tenue); line-height: 1.5; }
+.elenco-scalette { list-style: none; margin: 0; padding: 0; }
+.voce-scaletta {
+  display: block; width: 100%; text-align: left; border: 0; border-radius: 8px;
+  background: none; padding: 9px 10px; min-height: 0;
+}
+.voce-scaletta:hover { background: var(--carta); }
+.torna { border: 0; background: none; padding: 4px 0; color: var(--tenue); min-height: 0; }
+.nome-scaletta { font-family: var(--serif); font-size: 20px; font-weight: 600; margin: 6px 0 2px; }
+.occasione { color: var(--tenue); margin: 0 0 8px; }
+.canti-scaletta { margin: 8px 0 12px; padding-left: 26px; }
+.canti-scaletta li { padding: 5px 0; font-family: var(--serif); font-size: 16px; }
+.canti-scaletta a { color: inherit; text-decoration: none; }
+.canti-scaletta a:hover { text-decoration: underline; }
+.canti-scaletta a[aria-current="page"] { color: var(--rubrica); font-weight: 600; }
+.canti-scaletta .mancante { color: var(--tenue); font-style: italic; }
+.canti-scaletta.in-modifica li { display: flex; align-items: center; gap: 4px; }
+.canti-scaletta.in-modifica .titolo { flex: 1; }
+.canti-scaletta.in-modifica button { min-height: 28px; min-width: 28px; padding: 0 6px; font-size: 13px; }
+.scalette .campo {
+  display: block; width: 100%; margin: 6px 0; font: inherit; font-size: 15px; padding: 8px 10px;
+  border: 1px solid var(--linea); border-radius: 8px; background: var(--carta); color: inherit;
+}
+.proposte { list-style: none; margin: 0 0 10px; padding: 0; }
+.proposte button {
+  display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--linea);
+  border-radius: 0; background: none; min-height: 32px; font-family: var(--serif); font-size: 15px;
+}
+.proposte button:hover { background: var(--carta); }
+.proposte small { color: var(--tenue); font-family: var(--sans); }
+
+/* frecce sopra il canto, quando si scorre una scaletta */
+.naviga-scaletta {
+  flex-basis: 100%; display: flex; align-items: center; gap: 8px;
+  background: var(--pannello); border: 1px solid var(--linea); border-radius: 10px; padding: 4px;
+}
+.naviga-scaletta[hidden] { display: none; }
+.naviga-scaletta #pos-scaletta { flex: 1; text-align: center; font-size: 14px; font-weight: 600; }
+.naviga-scaletta button { min-width: 44px; font-size: 20px; padding: 0 10px; }
+.naviga-scaletta .esci { min-width: 36px; font-size: 16px; color: var(--tenue); }
+@media print { .naviga-scaletta, .schede { display: none !important; } }

@@ -681,6 +681,7 @@ function mostraCanto(canto) {
   $("foglio").hidden = !canto;
   chiudiModificaCanto();
   aggiornaElenco();
+  aggiornaNavigazione();
   if (!canto) { document.title = "Chi canta prega due volte"; return; }
   intestazione(canto);
   disegnaTag();
@@ -1086,6 +1087,7 @@ function mostraBlocco(messaggio) {
 async function sblocca(chiave) {
   try {
     await caricaOnline(chiave);
+    await caricaScalette();
   } catch (e) {
     mostraBlocco(e.name === "OperationError"
       ? "Chiave non valida: controlla il link che hai ricevuto."
@@ -1427,6 +1429,259 @@ async function eliminaCanto() {
   }
 }
 
+/* ===== Scalette ========================================================= */
+
+// Una scaletta è una serie ordinata di canti per un'occasione (un ritiro, una Messa).
+// Online sta in dati/scalette.bin, cifrata come i canti (per cambiarla serve la password);
+// nella copia sul PC resta nel browser.
+let SCALETTE = [];                                  // [{ id, nome, occasione, canti: [id] }]
+const vista = { scheda: "canti", aperta: null, bozza: null };
+let scalettaAttiva = null;  // la scaletta che si sta scorrendo con ‹ › sopra il canto
+
+function scaletteLocali() {
+  try { return JSON.parse(localStorage.getItem("canti-scalette")) || []; } catch { return []; }
+}
+
+async function apriScaletteCifrate(byte) {
+  const chiaro = await decifra(sito.chiave, byte, "scalette");
+  return JSON.parse(decodifica(await gzip(new Uint8Array(chiaro), false))).scalette;
+}
+
+async function caricaScalette() {
+  if (!sito.attivo) { SCALETTE = scaletteLocali(); return; }
+  const res = await fetch("dati/scalette.bin", { cache: "no-cache" }).catch(() => null);
+  SCALETTE = [];
+  if (res && res.ok) {
+    try { SCALETTE = await apriScaletteCifrate(await res.arrayBuffer()); } catch { /* file illeggibile: nessuna scaletta */ }
+  }
+}
+
+/** Salva le scalette; cambia() riceve l'elenco più recente (anche se cambiato da un altro dispositivo). */
+async function salvaScalette(cambia, messaggio) {
+  if (!sito.attivo) {
+    SCALETTE = cambia(scaletteLocali());
+    try { localStorage.setItem("canti-scalette", JSON.stringify(SCALETTE)); return true; }
+    catch { avviso("Non riesco a salvare nel browser"); return false; }
+  }
+  if (!(await sbloccaModifiche())) return false;
+  avviso("Salvataggio…");
+  try {
+    let attuale = null;
+    try { attuale = await github("contents/dati/scalette.bin"); }
+    catch (e) { if (!/404/.test(e.message)) throw e; }
+    const elenco = cambia(attuale ? await apriScaletteCifrate(daBase64(attuale.content)) : []);
+    const byte = await cifra(sito.chiave, await gzip(codifica(JSON.stringify({ scalette: elenco })), true), "scalette");
+    await github("contents/dati/scalette.bin", {
+      method: "PUT",
+      body: JSON.stringify({ message: messaggio, content: aBase64(byte), ...(attuale ? { sha: attuale.sha } : {}) }),
+    });
+    SCALETTE = elenco;
+    avviso("Scaletta salvata ✓");
+    return true;
+  } catch (e) {
+    avviso(`Non salvata: ${e.message}`);
+    return false;
+  }
+}
+
+const titoloDi = id => (CANTI.find(c => c.id === id) || {}).meta?.title;
+
+function mostraScheda(scheda) {
+  vista.scheda = scheda;
+  $("scheda-canti").setAttribute("aria-pressed", scheda === "canti");
+  $("scheda-scalette").setAttribute("aria-pressed", scheda === "scalette");
+  $("testa-canti").hidden = $("risultati").hidden = scheda !== "canti";
+  $("scalette").hidden = scheda !== "scalette";
+  if (scheda === "scalette") disegnaScalette();
+}
+
+function disegnaScalette() {
+  const box = $("scalette");
+  box.replaceChildren();
+  if (vista.bozza) { disegnaEditorScaletta(box); return; }
+  const aperta = SCALETTE.find(s => s.id === vista.aperta);
+  if (aperta) { disegnaScaletta(box, aperta); return; }
+
+  const nuova = el("button", "primario", "+ Nuova scaletta");
+  nuova.onclick = () => modificaScaletta(null);
+  box.append(nuova);
+  if (!SCALETTE.length) {
+    box.append(el("p", "scalette-vuoto", "Nessuna scaletta. Creane una per un ritiro o una celebrazione: " +
+      "scegli i canti e mettili nell’ordine in cui li canterete."));
+    return;
+  }
+  const ul = el("ul", "elenco-scalette");
+  for (const s of SCALETTE) {
+    const b = el("button", "voce-scaletta");
+    b.append(el("span", "r-titolo", s.nome));
+    b.append(el("span", "r-dettaglio", [s.occasione, `${s.canti.length} ${s.canti.length === 1 ? "canto" : "canti"}`]
+      .filter(Boolean).join(" · ")));
+    b.onclick = () => { vista.aperta = s.id; disegnaScalette(); };
+    const li = el("li");
+    li.append(b);
+    ul.append(li);
+  }
+  box.append(ul);
+}
+
+function disegnaScaletta(box, s) {
+  const tutte = el("button", "torna", "‹ Tutte le scalette");
+  tutte.onclick = () => { vista.aperta = null; disegnaScalette(); };
+  box.append(tutte, el("h2", "nome-scaletta", s.nome));
+  if (s.occasione) box.append(el("p", "occasione", s.occasione));
+  const ol = el("ol", "canti-scaletta");
+  s.canti.forEach(id => {
+    const li = el("li");
+    const titolo = titoloDi(id);
+    if (titolo) {
+      const a = el("a", null, titolo);
+      a.href = "#/" + id;
+      a.onclick = () => entraInScaletta(s.id);
+      if (stato.corrente && stato.corrente.id === id && scalettaAttiva === s.id) a.setAttribute("aria-current", "page");
+      li.append(a);
+    } else {
+      li.append(el("span", "mancante", "(canto non più presente)"));
+    }
+    ol.append(li);
+  });
+  box.append(ol);
+  const comandi = el("div", "editor-comandi");
+  if (s.canti.some(titoloDi)) {
+    const inizia = el("button", "primario", "▶ Inizia");
+    inizia.onclick = () => { entraInScaletta(s.id); location.hash = "#/" + s.canti.find(titoloDi); };
+    comandi.append(inizia);
+  }
+  const modifica = el("button", null, "✎ Modifica");
+  modifica.onclick = () => modificaScaletta(s);
+  const elimina = el("button", "pericolo", "Elimina");
+  elimina.onclick = async () => {
+    const ok = await finestra({ titolo: `Eliminare la scaletta «${s.nome}»?`, testo: "I canti restano nel canzoniere.", ok: "Elimina" });
+    if (ok && await salvaScalette(l => l.filter(x => x.id !== s.id), `Elimina scaletta: ${s.nome}`)) {
+      vista.aperta = null;
+      if (scalettaAttiva === s.id) entraInScaletta(null);
+      disegnaScalette();
+    }
+  };
+  comandi.append(modifica, elimina);
+  box.append(comandi);
+}
+
+async function modificaScaletta(s) {
+  if (sito.attivo && !(await sbloccaModifiche())) return;
+  vista.bozza = s ? { ...s, canti: [...s.canti] } : { id: null, nome: "", occasione: "", canti: [] };
+  mostraScheda("scalette");
+}
+
+function disegnaEditorScaletta(box) {
+  const b = vista.bozza;
+  const nome = el("input", "campo");
+  Object.assign(nome, { placeholder: "Nome (es. Ritiro di Pentecoste)", value: b.nome });
+  nome.oninput = () => { b.nome = nome.value; };
+  const occasione = el("input", "campo");
+  Object.assign(occasione, { placeholder: "Occasione, data, note (facoltativo)", value: b.occasione || "" });
+  occasione.oninput = () => { b.occasione = occasione.value; };
+  box.append(el("h2", "nome-scaletta", b.id ? "Modifica scaletta" : "Nuova scaletta"), nome, occasione);
+
+  // canti in ordine, con le frecce per spostarli
+  const ol = el("ol", "canti-scaletta in-modifica");
+  b.canti.forEach((id, i) => {
+    const li = el("li");
+    li.append(el("span", "titolo", titoloDi(id) || "(canto non più presente)"));
+    const sposta = (d) => { [b.canti[i], b.canti[i + d]] = [b.canti[i + d], b.canti[i]]; disegnaScalette(); };
+    const su = el("button", null, "↑");
+    su.title = "Sposta su";
+    su.disabled = i === 0;
+    su.onclick = () => sposta(-1);
+    const giu = el("button", null, "↓");
+    giu.title = "Sposta giù";
+    giu.disabled = i === b.canti.length - 1;
+    giu.onclick = () => sposta(1);
+    const togli = el("button", null, "×");
+    togli.title = "Togli dalla scaletta";
+    togli.onclick = () => { b.canti.splice(i, 1); disegnaScalette(); };
+    li.append(su, giu, togli);
+    ol.append(li);
+  });
+  if (!b.canti.length) box.append(el("p", "scalette-vuoto", "Aggiungi i canti cercandoli qui sotto."));
+  box.append(ol);
+
+  // aggiungere un canto: si cerca per titolo, parole o tag
+  const cerca = el("input", "campo");
+  Object.assign(cerca, { type: "search", placeholder: "Aggiungi un canto: cerca titolo, parole o tag…" });
+  const proposte = el("ul", "proposte");
+  cerca.oninput = () => {
+    proposte.replaceChildren();
+    const termini = normalizza(cerca.value.trim()).split(/\s+/).filter(Boolean);
+    if (!termini.length) return;
+    CANTI.filter(c => {
+      const testo = c.ricerca + " " + normalizza(tagDi(c).join(" "));
+      return termini.every(t => testo.includes(t));
+    }).slice(0, 8).forEach(c => {
+      const p = el("button", null, c.meta.title);
+      if (b.canti.includes(c.id)) p.append(el("small", null, " (già nella scaletta)"));
+      p.onclick = () => {
+        b.canti.push(c.id);
+        disegnaScalette();
+        const nuovo = $("scalette").querySelector('input[type="search"]');
+        if (nuovo) nuovo.focus();
+      };
+      const li = el("li");
+      li.append(p);
+      proposte.append(li);
+    });
+  };
+  box.append(cerca, proposte);
+
+  const comandi = el("div", "editor-comandi");
+  const salvaB = el("button", "primario", sito.attivo ? "Salva online" : "Salva");
+  salvaB.onclick = async () => {
+    if (!b.nome.trim()) { avviso("Dai un nome alla scaletta"); nome.focus(); return; }
+    const id = b.id || "s" + Date.now().toString(36);
+    const nuova = { id, nome: b.nome.trim(), occasione: (b.occasione || "").trim(), canti: b.canti };
+    const ok = await salvaScalette(l => {
+      const i = l.findIndex(x => x.id === id);
+      if (i >= 0) l[i] = nuova; else l.unshift(nuova);
+      return l;
+    }, `Scaletta: ${nuova.nome}`);
+    if (ok) { vista.bozza = null; vista.aperta = id; disegnaScalette(); aggiornaNavigazione(); }
+  };
+  const annulla = el("button", null, "Annulla");
+  annulla.onclick = () => { vista.bozza = null; disegnaScalette(); };
+  comandi.append(salvaB, annulla);
+  box.append(comandi);
+}
+
+/** Entra in una scaletta: sopra i suoi canti compaiono le frecce ‹ › (null per uscire). */
+function entraInScaletta(id) {
+  scalettaAttiva = id;
+  try { id ? sessionStorage.setItem("scaletta-attiva", id) : sessionStorage.removeItem("scaletta-attiva"); }
+  catch { /* resterà solo per questa pagina */ }
+  aggiornaNavigazione();
+}
+
+function posizioneInScaletta() {
+  const s = SCALETTE.find(x => x.id === scalettaAttiva);
+  const i = s && stato.corrente ? s.canti.indexOf(stato.corrente.id) : -1;
+  return { s, i };
+}
+
+function aggiornaNavigazione() {
+  const { s, i } = posizioneInScaletta();
+  $("naviga-scaletta").hidden = i < 0 || !!inModifica;
+  if (i < 0) return;
+  $("pos-scaletta").textContent = `${s.nome} · ${i + 1}/${s.canti.length}`;
+  $("prec-scaletta").disabled = i === 0;
+  $("succ-scaletta").disabled = i === s.canti.length - 1;
+  if (vista.scheda === "scalette" && vista.aperta === s.id && !vista.bozza) disegnaScalette();
+}
+
+function vaiInScaletta(d) {
+  const { s, i } = posizioneInScaletta();
+  if (i < 0) return;
+  const id = s.canti[i + d];
+  if (id) location.hash = "#/" + id;
+}
+
 /* ===== Comandi ========================================================== */
 
 function trasponi(delta) {
@@ -1487,7 +1742,15 @@ document.addEventListener("keydown", e => {
     e.preventDefault();
     scorri.attivo ? fermaScorrimento() : avviaScorrimento();
   }
+  // nella scaletta: frecce (anche quelle dei pedali voltapagina) per il canto prima e dopo
+  else if (!$("naviga-scaletta").hidden && ["ArrowRight", "PageDown"].includes(e.key) && !scorri.attivo) vaiInScaletta(1);
+  else if (!$("naviga-scaletta").hidden && ["ArrowLeft", "PageUp"].includes(e.key) && !scorri.attivo) vaiInScaletta(-1);
 });
+$("scheda-canti").onclick = () => mostraScheda("canti");
+$("scheda-scalette").onclick = () => mostraScheda("scalette");
+$("prec-scaletta").onclick = () => vaiInScaletta(-1);
+$("succ-scaletta").onclick = () => vaiInScaletta(1);
+$("esci-scaletta").onclick = () => entraInScaletta(null);
 window.addEventListener("hashchange", apriDaIndirizzo);
 
 $("modifica-canto").onclick = () => modificaCanto(stato.corrente);
@@ -1519,11 +1782,15 @@ $("torna-copertina").onclick = e => {
 };
 
 async function avvia() {
-  let vista = false;
-  try { vista = !!sessionStorage.getItem("copertina-vista"); } catch { /* niente */ }
-  if (!vista && !location.hash.startsWith("#/")) document.body.classList.add("in-copertina");
+  let copertinaVista = false;
+  try {
+    copertinaVista = !!sessionStorage.getItem("copertina-vista");
+    scalettaAttiva = sessionStorage.getItem("scaletta-attiva");
+  } catch { /* niente */ }
+  if (!copertinaVista && !location.hash.startsWith("#/")) document.body.classList.add("in-copertina");
   if (window.CANTI) {
     impostaCanti(window.CANTI);   // versione locale: canti in chiaro da canti.js
+    await caricaScalette();
   } else {
     sito.attivo = true;
     document.body.classList.add("online");
