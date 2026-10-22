@@ -57,13 +57,6 @@ function trasponiAccordo(accordo, n, bemolli, notazioneInt) {
   return apri + radice + suffisso + (basso ? "/" + basso + (notazioneInt && bMin ? "m" : bMin) : "") + chiudi;
 }
 
-/** Traspone le note scritte in minuscolo: "si-mi-fa#-sol#". */
-function trasponiNoteTesto(testo, n, bemolli) {
-  if (!n) return testo;
-  return testo.replace(/(do|re|mi|fa|sol|la|si)([#b]?)/g, (_, nome, alt) =>
-    nomeNota(semitono(maiuscola(nome), alt) + n, bemolli).toLowerCase());
-}
-
 /** "Re maggiore" trasposto di n -> "Mi maggiore" */
 function trasponiNomeTonalita(testo, n) {
   if (!n || !testo) return testo;
@@ -190,6 +183,8 @@ function leggiMelodia(righe) {
 
 /** Formato rapido "la-re-re--mi": i trattini dopo la nota ne indicano la durata. */
 function noteDaTrattini(testo) {
+  // scritte già con le durate in numeri ("si2 si4 p4"): valgono come nel formato completo
+  if (/\d/.test(testo) || /(^|\s)p(\d|\s|$)/i.test(testo)) return testo.trim();
   const figure = { 0: "4", 1: "4", 2: "2", 3: "2.", 4: "1" };
   const note = [];
   // anche qui ' alza e , abbassa di un'ottava ("fa'"); gli spazi non sono battute
@@ -270,12 +265,11 @@ function abcDaSorgente(sorgente, canto) {
   const abc = /\{\s*(?:start_of_abc|soa)\s*\}([\s\S]*?)(?:\{\s*(?:end_of_abc|eoa)\s*\}|$)/i.exec(sorgente);
   if (abc) return { abc: abc[1].trim(), errori: [], tonalita: "", haTempo: /^Q:/m.test(abc[1]) };
 
-  let mel, noteTesto = "";
+  let mel;
   const rapida = /\{\s*melodia_note\s*:\s*([^}]*)\}/i.exec(sorgente);
   if (rapida) {
     const [ton, note = ""] = rapida[1].split("|").map(s => s.trim());
     mel = { tonalita: ton, metro: "", bpm: "", righe: [{ note: noteDaTrattini(note), testo: "" }], errori: [] };
-    noteTesto = note;
   } else {
     mel = leggiMelodia(sorgente.split(/\r?\n/));
   }
@@ -283,7 +277,7 @@ function abcDaSorgente(sorgente, canto) {
   if (!mel.tonalita && canto) mel.tonalita = tonalitaEstesa(canto.meta.key);
   if (!mel.metro && canto) mel.metro = canto.meta.metro;
   if (!mel.bpm && canto) mel.bpm = canto.meta.bpm;
-  return { ...abcDaMelodia(mel), tonalita: mel.tonalita, noteTesto, haTempo: !!mel.bpm };
+  return { ...abcDaMelodia(mel), tonalita: mel.tonalita, haTempo: !!mel.bpm };
 }
 
 /** "Re" -> "Re maggiore", "Re-" -> "Re minore" */
@@ -854,10 +848,9 @@ function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false) {
   const testa = el("div", "melodia-testa");
   const etichetta = el("span", "melodia-titolo");
   const pent = el("div", "pentagramma");
-  const noteP = el("p", "melodia-note");
   const avvisi = el("p", "melodia-errori");
   testa.append(etichetta);
-  box.append(testa, pent, noteP, avvisi);
+  box.append(testa, pent, avvisi);
 
   let visual = null, risultato = null, traspAttuale = n;
   const rendi = (testo, trasp) => {
@@ -866,9 +859,6 @@ function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false) {
     const r = risultato;
     const ton = trasponiNomeTonalita(r.tonalita, trasp);
     etichetta.textContent = "Melodia" + (ton ? " · " + ton : "") + (trasp ? ` (${trasp > 0 ? "+" : ""}${trasp})` : "");
-    noteP.textContent = r.noteTesto && !editor.isConnected
-      ? trasponiNoteTesto(r.noteTesto, trasp, bemolli).replace(/-+/g, m => " " + "–".repeat(m.length) + " ")
-      : "";
     avvisi.textContent = r.errori.length ? "Da correggere: " + r.errori.join(" · ") : "";
     pent.replaceChildren();
     visual = null;
@@ -1347,7 +1337,9 @@ async function modificaCanto(canto) {
   }
   fermaScorrimento();
   const area = $("pm-testo");
-  area.value = canto ? testoDi(canto.id) : MODELLO;
+  // la melodia nel formato rapido del PDF diventa il blocco completo, quello della guida
+  area.value = canto ? testoDi(canto.id).replace(/^\{\s*melodia_note\s*:[^}]*\}[ \t]*$/gim, m => bloccoDaTrattini(m))
+    : MODELLO;
   $("pm-elimina").hidden = !canto;
   $("pannello-modifica").hidden = false;
   document.body.classList.add("in-modifica");

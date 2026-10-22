@@ -185,12 +185,11 @@ mark { background: var(--evidenzia); color: inherit; border-radius: 2px; }
 .melodia { margin: 1em 0 1.4em; padding: .6em .9em; border: 1px solid var(--linea); border-radius: 10px; }
 .melodia-testa { display: flex; gap: 10px; align-items: center; font-family: var(--sans); font-size: 13px; color: var(--tenue); }
 .melodia-testa button { min-height: 30px; padding: 3px 10px; font-size: 13px; }
-.melodia-note { font-family: var(--sans); font-size: 14px; margin: .3em 0 0; letter-spacing: .02em; }
 .pentagramma { max-width: 560px; color: var(--inchiostro); }
 .pentagramma svg { color: var(--inchiostro); }
 .melodia-titolo { margin-right: auto; }
 .melodia-errori { color: var(--rubrica); font-family: var(--sans); font-size: 13px; margin: .3em 0 0; }
-.melodia-errori:empty, .melodia-note:empty { display: none; }
+.melodia-errori:empty { display: none; }
 .editor { margin-top: .8em; font-family: var(--sans); }
 .editor textarea {
   width: 100%; font-family: ui-monospace, Consolas, monospace; font-size: 14px; line-height: 1.5;
