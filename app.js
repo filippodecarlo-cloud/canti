@@ -352,13 +352,15 @@ const el = (tag, cls, testo) => {
 
 /* ===== Tag ============================================================== */
 
-const tagDi = c => stato.tag[c.id] || c.meta.tags;
+// online i tag sono solo quelli salvati nel canto; nella copia sul PC valgono anche quelli del browser
+const tagDi = c => (!sito.attivo && stato.tag[c.id]) || c.meta.tags;
 const stessiTag = (a, b) => a.length === b.length && a.every(t => b.includes(t));
 
 async function impostaTag(canto, tags) {
   const puliti = [...new Set(tags.map(t => t.trim()).filter(Boolean))];
-  if (sito.token) {
-    // modifiche sbloccate: il tag si salva direttamente nel canto online
+  if (sito.attivo) {
+    // online i tag si cambiano solo con la password, e si salvano direttamente nel canto
+    if (!(await sbloccaModifiche())) { disegnaTag(); return; }
     const riga = `{tags: ${puliti.join(", ")}}`;
     const testo = testoDi(canto.id);
     const nuovo = /^\{tags:.*\}$/m.test(testo) ? testo.replace(/^\{tags:.*\}$/m, riga)
@@ -435,20 +437,30 @@ function passaFiltri(canto, salvoGruppo) {
   return [...perGruppo.values()].every(scelti => scelti.some(f => tags.includes(f)));
 }
 
-/** I tag del canto aperto: si tolgono con × e si aggiungono con "+ tag". */
+/** I tag del canto aperto: si tolgono con × e si aggiungono con "+ tag" (online, dopo la password). */
 function disegnaTag() {
   const canto = stato.corrente;
   const box = $("tag-canto");
   box.replaceChildren();
   if (!canto) return;
+  const modificabili = !sito.attivo || !!sito.token;
   for (const t of ordinaTag(tagDi(canto))) {
     const chip = coloraTag(el("span", "chip", t), t);
     chip.title = gruppoDi(t);
-    const togli = el("button", "chip-x", "×");
-    togli.title = `Togli il tag "${t}"`;
-    togli.onclick = () => impostaTag(canto, tagDi(canto).filter(x => x !== t));
-    chip.append(togli);
+    if (modificabili) {
+      const togli = el("button", "chip-x", "×");
+      togli.title = `Togli il tag "${t}"`;
+      togli.onclick = () => impostaTag(canto, tagDi(canto).filter(x => x !== t));
+      chip.append(togli);
+    }
     box.append(chip);
+  }
+  if (!modificabili) {
+    const sblocca = el("button", "chip chip-nuovo", "✎ tag");
+    sblocca.title = "Modifica i tag (serve la password)";
+    sblocca.onclick = async () => { if (await sbloccaModifiche()) disegnaTag(); };
+    if (!inModifica) box.append(sblocca);
+    return;
   }
   const piu = el("button", "chip chip-nuovo", "+ tag");
   piu.onclick = () => {
@@ -526,7 +538,7 @@ function aggiornaElenco() {
   // i filtri scelti restano visibili, con i loro colori, anche a pannello chiuso
   $("filtri-attivi").replaceChildren(...attivi.map(t => coloraTag(el("span", "chip mini", t), t)));
   $("azzera-filtri").hidden = !attivi.length;
-  $("esporta-tag").hidden = !Object.keys(stato.tag).length;
+  $("esporta-tag").hidden = sito.attivo || !Object.keys(stato.tag).length;
 
   const lista = $("risultati");
   lista.replaceChildren();
