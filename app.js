@@ -374,10 +374,44 @@ async function impostaTag(canto, tags) {
   aggiornaElenco();
 }
 
+// I tag sono divisi in categorie. Nei filtri, dentro una categoria basta uno dei tag scelti
+// (Comunione o Adorazione eucaristica); tra categorie diverse servono tutti (Gesù e Meditativo).
+const GRUPPI_TAG = [
+  ["A chi è rivolto", ["Padre", "Gesù", "Spirito Santo", "Trinità", "Maria"]],
+  ["Temi", ["Lode", "Adorazione", "Ringraziamento", "Amore di Dio", "Fiducia", "Speranza", "Gioia", "Pace",
+    "Perdono", "Misericordia", "Guarigione", "Croce", "Risurrezione", "Offerta", "Chiamata", "Missione",
+    "Servizio", "Unità", "Parola", "Creazione", "Ricerca di Dio"]],
+  ["Sacramenti", ["Eucaristia", "Riconciliazione", "Battesimo", "Cresima", "Matrimonio"]],
+  ["Momenti del ritiro", ["Inizio", "Invocazione allo Spirito", "Adorazione eucaristica", "Meditazione",
+    "Celebrazione penitenziale", "Preghiera di guarigione", "Mandato"]],
+  ["Messa", ["Ingresso", "Atto penitenziale", "Gloria", "Alleluia", "Offertorio", "Santo", "Agnello di Dio",
+    "Comunione", "Dopo la comunione", "Finale"]],
+  ["Tempo liturgico", ["Avvento", "Natale", "Quaresima", "Pasqua", "Pentecoste"]],
+  ["Carattere", ["Festoso", "Meditativo", "Breve"]],
+  ["Lingua", ["Latino", "Spagnolo"]],
+];
+const GRUPPO_DI = new Map(GRUPPI_TAG.flatMap(([g, tags]) => tags.map(t => [t, g])));
+const ORDINE_TAG = new Map(GRUPPI_TAG.flatMap(([, tags]) => tags).map((t, i) => [t, i]));
+const gruppoDi = t => GRUPPO_DI.get(t) || "Altri";
+const ordinaTag = tags => [...tags].sort((a, b) =>
+  (ORDINE_TAG.get(a) ?? 999) - (ORDINE_TAG.get(b) ?? 999) || a.localeCompare(b, "it"));
+
 function tuttiTag() {
   const conta = new Map();
   for (const c of CANTI) for (const t of tagDi(c)) conta.set(t, (conta.get(t) || 0) + 1);
-  return [...conta].sort((a, b) => a[0].localeCompare(b[0], "it"));
+  return ordinaTag(conta.keys()).map(t => [t, conta.get(t)]);
+}
+
+/** Il canto rispetta i filtri scelti? (esclusi, se indicata, quelli di una categoria) */
+function passaFiltri(canto, salvoGruppo) {
+  const tags = tagDi(canto);
+  const perGruppo = new Map();
+  for (const f of stato.filtri) {
+    const g = gruppoDi(f);
+    if (g === salvoGruppo) continue;
+    perGruppo.set(g, [...(perGruppo.get(g) || []), f]);
+  }
+  return [...perGruppo.values()].every(scelti => scelti.some(f => tags.includes(f)));
 }
 
 /** I tag del canto aperto: si tolgono con × e si aggiungono con "+ tag". */
@@ -386,8 +420,9 @@ function disegnaTag() {
   const box = $("tag-canto");
   box.replaceChildren();
   if (!canto) return;
-  for (const t of tagDi(canto)) {
+  for (const t of ordinaTag(tagDi(canto))) {
     const chip = el("span", "chip", t);
+    chip.title = gruppoDi(t);
     const togli = el("button", "chip-x", "×");
     togli.title = `Togli il tag "${t}"`;
     togli.onclick = () => impostaTag(canto, tagDi(canto).filter(x => x !== t));
@@ -437,31 +472,44 @@ function aggiornaElenco() {
   const termini = q.split(/\s+/).filter(Boolean);
   const tags = tuttiTag();
   stato.filtri = stato.filtri.filter(f => tags.some(([t]) => t === f));
+  const cercati = CANTI.filter(c => {
+    const testo = c.ricerca + " " + normalizza(tagDi(c).join(" "));
+    return termini.every(t => testo.includes(t));
+  });
 
-  // chip dei tag per filtrare
+  // filtri divisi per categoria; accanto a ogni tag, quanti canti si otterrebbero scegliendolo
   const filtri = $("filtri");
   filtri.replaceChildren();
-  for (const [t, quanti] of tags) {
-    const b = el("button", "chip filtro", t);
-    b.append(el("small", null, " " + quanti));
-    b.setAttribute("aria-pressed", stato.filtri.includes(t));
-    b.onclick = () => {
-      stato.filtri = stato.filtri.includes(t) ? stato.filtri.filter(f => f !== t) : [...stato.filtri, t];
-      salva();
-      aggiornaElenco();
-    };
-    filtri.append(b);
+  const gruppi = new Map();
+  for (const [t] of tags) gruppi.set(gruppoDi(t), [...(gruppi.get(gruppoDi(t)) || []), t]);
+  for (const [gruppo, suoi] of gruppi) {
+    const box = el("div", "gruppo-filtri");
+    box.append(el("div", "gruppo-nome", gruppo));
+    const possibili = cercati.filter(c => passaFiltri(c, gruppo));
+    for (const t of suoi) {
+      const quanti = possibili.filter(c => tagDi(c).includes(t)).length;
+      const scelto = stato.filtri.includes(t);
+      const b = el("button", "chip filtro" + (quanti || scelto ? "" : " vuoto"), t);
+      b.append(el("small", null, " " + quanti));
+      b.setAttribute("aria-pressed", scelto);
+      b.onclick = () => {
+        stato.filtri = scelto ? stato.filtri.filter(f => f !== t) : [...stato.filtri, t];
+        salva();
+        aggiornaElenco();
+      };
+      box.append(b);
+    }
+    filtri.append(box);
   }
+  const attivi = ordinaTag(stato.filtri);
+  $("filtri-attivi").textContent = attivi.length ? attivi.join(" · ") : "";
+  $("azzera-filtri").hidden = !attivi.length;
   $("esporta-tag").hidden = !Object.keys(stato.tag).length;
 
   const lista = $("risultati");
   lista.replaceChildren();
-  const trovati = CANTI
-    .filter(c => stato.filtri.every(f => tagDi(c).includes(f)))
-    .filter(c => {
-      const testo = c.ricerca + " " + normalizza(tagDi(c).join(" "));
-      return termini.every(t => testo.includes(t));
-    })
+  const trovati = cercati
+    .filter(c => passaFiltri(c))
     .map(c => ({ c, nelTitolo: termini.every(t => c.titoloNorm.includes(t)) }))
     .sort((a, b) => (b.nelTitolo - a.nelTitolo));
 
@@ -1272,6 +1320,7 @@ $("scorri-via").onclick = () => (scorri.attivo ? fermaScorrimento() : avviaScorr
 $("scorri-lento").onclick = () => cambiaVelocita(-1);
 $("scorri-veloce").onclick = () => cambiaVelocita(1);
 $("esporta-tag").onclick = esportaTag;
+$("azzera-filtri").onclick = () => { stato.filtri = []; salva(); aggiornaElenco(); };
 $("indietro").onclick = () => { location.hash = ""; };
 $("cerca").addEventListener("input", aggiornaElenco);
 $("cerca").addEventListener("keydown", e => {

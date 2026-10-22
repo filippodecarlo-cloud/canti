@@ -19,7 +19,13 @@
       <button id="nuovo-canto" class="solo-online" title="Aggiungi un canto (serve la password)">+ Canto</button>
     </div>
     <input id="cerca" type="search" placeholder="Cerca titolo o parole…" autocomplete="off" aria-label="Cerca un canto">
-    <div id="filtri" class="filtri" aria-label="Filtra per tag"></div>
+    <details id="pannello-filtri" class="pannello-filtri">
+      <summary>Filtri <span id="filtri-attivi"></span></summary>
+      <p class="filtri-aiuto">Nella stessa categoria basta uno dei tag scelti; tra categorie diverse servono tutti.
+        Il numero indica quanti canti trovi scegliendo quel tag.</p>
+      <div id="filtri" aria-label="Filtra per tag"></div>
+    </details>
+    <button id="azzera-filtri" class="azzera-filtri" hidden>× Togli i filtri</button>
     <p id="conteggio"></p>
   </header>
   <ul id="risultati"></ul>

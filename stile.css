@@ -130,8 +130,18 @@ mark { background: var(--evidenzia); color: inherit; border-radius: 2px; }
 .chip-nuovo { color: var(--tenue); border-style: dashed; cursor: pointer; }
 .chip-input { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rubrica); background: var(--carta); color: inherit; width: 140px; }
 .tag-canto { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.filtri { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; max-height: 96px; overflow-y: auto; }
-.filtri:empty { display: none; }
+.pannello-filtri { margin-top: 10px; }
+.pannello-filtri summary { cursor: pointer; font-size: 14px; font-weight: 600; padding: 6px 2px; }
+#filtri-attivi { font-weight: 400; color: var(--rubrica); }
+.filtri-aiuto { font-size: 12px; color: var(--tenue); margin: 2px 0 6px; line-height: 1.4; }
+#filtri { max-height: 52vh; overflow-y: auto; padding-right: 4px; }
+.gruppo-filtri { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.gruppo-nome {
+  width: 100%; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--tenue); margin-bottom: 1px;
+}
+.filtro.vuoto { opacity: .4; }
+.azzera-filtri { margin-top: 6px; font-size: 13px; min-height: 30px; padding: 3px 10px; }
 .filtro { cursor: pointer; }
 .filtro[aria-pressed="true"] { background: var(--rubrica); border-color: var(--rubrica); color: var(--carta); text-decoration: none; }
 .filtro[aria-pressed="true"] small { color: inherit; opacity: .8; }
