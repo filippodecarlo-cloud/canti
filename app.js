@@ -650,6 +650,7 @@ function aggiornaElenco() {
   $("conteggio").textContent = filtrato
     ? `${trovati.length} ${trovati.length === 1 ? "canto trovato" : "canti trovati"}`
     : `${CANTI.length} canti`;
+  aggiornaNavigazione();  // i filtri cambiano anche la serie delle frecce ‹ ›
 }
 
 /** Evidenzia i termini cercati (ignorando accenti e maiuscole). */
@@ -1780,28 +1781,60 @@ function entraInScaletta(id) {
   aggiornaNavigazione();
 }
 
+/**
+ * In che serie di canti si trova il canto aperto, per le frecce ‹ ›: la scaletta attiva, se il
+ * canto ne fa parte; altrimenti l'ordine alfabetico (solo i canti dei filtri scelti, se ci sono).
+ */
 function posizioneInScaletta() {
+  const canto = stato.corrente;
+  if (!canto) return { i: -1 };
   const s = SCALETTE.find(x => x.id === scalettaAttiva);
-  const i = s && stato.corrente ? s.canti.indexOf(stato.corrente.id) : -1;
-  return { s, i };
+  if (s && s.canti.includes(canto.id)) {
+    return { s, ids: s.canti, i: s.canti.indexOf(canto.id), nome: s.nome };
+  }
+  const filtrati = CANTI.filter(c => passaFiltri(c)).map(c => c.id);
+  if (stato.filtri.length && filtrati.includes(canto.id)) {
+    return { ids: filtrati, i: filtrati.indexOf(canto.id), nome: ordinaTag(stato.filtri).join(", ") };
+  }
+  const tutti = CANTI.map(c => c.id);
+  return { ids: tutti, i: tutti.indexOf(canto.id), nome: "A-Z" };
 }
 
 function aggiornaNavigazione() {
-  const { s, i } = posizioneInScaletta();
-  $("naviga-scaletta").hidden = i < 0 || !!inModifica;
+  const { s, ids, i, nome } = posizioneInScaletta();
+  const nav = $("naviga-scaletta");
+  nav.hidden = i < 0 || !!inModifica;
   if (i < 0) return;
-  $("pos-scaletta").textContent = `${s.nome} · ${i + 1}/${s.canti.length}`;
+  nav.classList.toggle("alfabetico", !s);
+  $("pos-scaletta").textContent = `${nome} · ${i + 1}/${ids.length}`;
+  $("pos-scaletta").title = s ? "Scaletta" : stato.filtri.length ? "Canti dei filtri scelti, in ordine alfabetico" : "Tutti i canti in ordine alfabetico";
   $("prec-scaletta").disabled = i === 0;
-  $("succ-scaletta").disabled = i === s.canti.length - 1;
-  if (vista.scheda === "scalette" && vista.aperta === s.id && !vista.bozza) disegnaScalette();
+  $("succ-scaletta").disabled = i === ids.length - 1;
+  $("esci-scaletta").hidden = !s;
+  if (s && vista.scheda === "scalette" && vista.aperta === s.id && !vista.bozza) disegnaScalette();
 }
 
 function vaiInScaletta(d) {
-  const { s, i } = posizioneInScaletta();
+  const { ids, i } = posizioneInScaletta();
   if (i < 0) return;
-  const id = s.canti[i + d];
+  const id = ids[i + d];
   if (id) location.hash = "#/" + id;
 }
+
+// sul telefono: trascinando il dito a sinistra o a destra si passa al canto dopo o prima
+let tocco = null;
+$("foglio").addEventListener("touchstart", e => {
+  const t = e.touches[0];
+  tocco = e.touches.length === 1 && !inModifica && !e.target.closest("textarea, input, select, .pentagramma")
+    ? { x: t.clientX, y: t.clientY } : null;
+}, { passive: true });
+$("foglio").addEventListener("touchend", e => {
+  if (!tocco) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - tocco.x, dy = t.clientY - tocco.y;
+  tocco = null;
+  if (Math.abs(dx) > 80 && Math.abs(dy) < Math.abs(dx) / 2) vaiInScaletta(dx < 0 ? 1 : -1);
+}, { passive: true });
 
 /* ===== Comandi ========================================================== */
 

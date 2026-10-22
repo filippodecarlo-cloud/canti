@@ -417,3 +417,9 @@ dialog#finestra select {
   border: 1px solid var(--linea); border-radius: 8px; background: var(--carta); color: inherit;
 }
 body.in-modifica #in-scaletta { display: none; }
+
+/* frecce ‹ › fuori dalle scalette: più discrete */
+.naviga-scaletta.alfabetico { background: none; border-color: transparent; padding: 0; }
+.naviga-scaletta.alfabetico #pos-scaletta { font-weight: 400; color: var(--tenue); font-size: 13px; }
+.naviga-scaletta.alfabetico button { min-height: 32px; font-size: 18px; }
+.barra button { white-space: nowrap; }
