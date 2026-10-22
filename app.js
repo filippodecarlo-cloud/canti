@@ -191,13 +191,12 @@ function leggiMelodia(righe) {
 /** Formato rapido "la-re-re--mi": i trattini dopo la nota ne indicano la durata. */
 function noteDaTrattini(testo) {
   const figure = { 0: "4", 1: "4", 2: "2", 3: "2.", 4: "1" };
-  return testo.trim().split(/\s+/).map(frase => {
-    const note = [];
-    const re = /(do|re|mi|fa|sol|la|si)([#b]?)(-*)/gi;
-    let m;
-    while ((m = re.exec(frase))) note.push(m[1].toLowerCase() + m[2] + figure[Math.min(m[3].length, 4)]);
-    return note.join(" ");
-  }).join(" | ");
+  const note = [];
+  // anche qui ' alza e , abbassa di un'ottava ("fa'"); gli spazi non sono battute
+  const re = /(do|re|mi|fa|sol|la|si)([#b]?)(['’,]*)(-*)/gi;
+  let m;
+  while ((m = re.exec(testo))) note.push(m[1].toLowerCase() + m[2] + m[3] + figure[Math.min(m[4].length, 4)]);
+  return note.join(" ");
 }
 
 function abcDaMelodia(mel) {
