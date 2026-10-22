@@ -396,6 +396,27 @@ const gruppoDi = t => GRUPPO_DI.get(t) || "Altri";
 const ordinaTag = tags => [...tags].sort((a, b) =>
   (ORDINE_TAG.get(a) ?? 999) - (ORDINE_TAG.get(b) ?? 999) || a.localeCompare(b, "it"));
 
+// Ogni tag ha il suo colore pastello: ogni categoria ha una famiglia di colori
+// (azzurri, verdi, gialli…) e i tag della categoria ne sono sfumature diverse.
+const TINTE_GRUPPI = [210, 120, 45, 275, 335, 20, 175, 85];  // nell'ordine di GRUPPI_TAG
+function tintaTag(t) {
+  const g = GRUPPI_TAG.findIndex(([nome]) => nome === gruppoDi(t));
+  if (g < 0) {  // "Altri": tinta ricavata dal nome, così resta sempre la stessa
+    let h = 0;
+    for (const c of t) h = (h * 31 + c.charCodeAt(0)) % 360;
+    return h;
+  }
+  const tags = GRUPPI_TAG[g][1];
+  const ampiezza = Math.min(70, tags.length * 12);  // più tag, più sfumature
+  const pos = tags.length > 1 ? tags.indexOf(t) / (tags.length - 1) - 0.5 : 0;
+  return Math.round((TINTE_GRUPPI[g] + pos * ampiezza + 360) % 360);
+}
+function coloraTag(elemento, t) {
+  elemento.classList.add("colorato");
+  elemento.style.setProperty("--tinta", tintaTag(t));
+  return elemento;
+}
+
 function tuttiTag() {
   const conta = new Map();
   for (const c of CANTI) for (const t of tagDi(c)) conta.set(t, (conta.get(t) || 0) + 1);
@@ -421,7 +442,7 @@ function disegnaTag() {
   box.replaceChildren();
   if (!canto) return;
   for (const t of ordinaTag(tagDi(canto))) {
-    const chip = el("span", "chip", t);
+    const chip = coloraTag(el("span", "chip", t), t);
     chip.title = gruppoDi(t);
     const togli = el("button", "chip-x", "×");
     togli.title = `Togli il tag "${t}"`;
@@ -489,7 +510,7 @@ function aggiornaElenco() {
     for (const t of suoi) {
       const quanti = possibili.filter(c => tagDi(c).includes(t)).length;
       const scelto = stato.filtri.includes(t);
-      const b = el("button", "chip filtro" + (quanti || scelto ? "" : " vuoto"), t);
+      const b = coloraTag(el("button", "chip filtro" + (quanti || scelto ? "" : " vuoto"), t), t);
       b.append(el("small", null, " " + quanti));
       b.setAttribute("aria-pressed", scelto);
       b.onclick = () => {
@@ -502,7 +523,8 @@ function aggiornaElenco() {
     filtri.append(box);
   }
   const attivi = ordinaTag(stato.filtri);
-  $("filtri-attivi").textContent = attivi.length ? attivi.join(" · ") : "";
+  // i filtri scelti restano visibili, con i loro colori, anche a pannello chiuso
+  $("filtri-attivi").replaceChildren(...attivi.map(t => coloraTag(el("span", "chip mini", t), t)));
   $("azzera-filtri").hidden = !attivi.length;
   $("esporta-tag").hidden = !Object.keys(stato.tag).length;
 
@@ -836,8 +858,9 @@ function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false) {
   const copia = el("button", null, "Copia per il file");
   const chiudi = el("button", null, "Chiudi");
   comandi.append(copia, chiudi);
-  let nota = `Qui vedi solo un'anteprima: per salvarla copia il testo e incollalo nel file canti/${canto.id}.cho ` +
-    "al posto del blocco della melodia (o in un punto qualsiasi, se è nuova), poi lancia genera_indice.py.";
+  let nota = "Questa è la copia sul PC: da qui non si salva su GitHub. Per salvare online premi «Copia per il file», " +
+    `apri il canzoniere dal sito (${SITO_ONLINE}), cerca il canto e incolla la melodia con ✎ Modifica → Salva nel canto. ` +
+    `In alternativa incollala nel file canti/${canto.id}.cho e lancia pubblica.py.`;
   if (sito.attivo) {
     // online la melodia si salva direttamente nel canto (serve la password)
     const salvaM = el("button", "primario", "Salva nel canto");
@@ -935,6 +958,7 @@ function cambiaVelocita(delta) {
 // lettura arriva dal link (#k=...) e resta salvata nel dispositivo. Per modificare serve la
 // password, che sblocca il token GitHub conservato (cifrato) in dati/editor.bin.
 const sito = { attivo: false, meta: null, chiave: null, token: null };
+const SITO_ONLINE = "https://filippodecarlo-cloud.github.io/canti/";
 const ITER_EDITOR = 600000;
 const codifica = s => new TextEncoder().encode(s);
 const decodifica = b => new TextDecoder().decode(b);
