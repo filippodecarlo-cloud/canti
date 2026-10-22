@@ -60,13 +60,15 @@
         <button id="succ-scaletta" title="Canto successivo della scaletta (freccia →)" aria-label="Canto successivo">›</button>
         <button id="esci-scaletta" class="esci" title="Esci dalla scaletta" aria-label="Esci dalla scaletta">×</button>
       </div>
-      <button id="indietro" class="solo-mobile" title="Torna all’elenco" aria-label="Torna all’elenco">‹ Elenco</button>
+      <button id="indietro" class="solo-mobile" title="Torna all’elenco" aria-label="Torna all’elenco">‹ <span class="etichetta">Elenco</span></button>
       <div class="gruppo" role="group" aria-label="Trasposizione">
         <button id="giu" title="Abbassa di un semitono (tasto −)">−</button>
         <span id="tonalita" class="tonalita"></span>
         <button id="su" title="Alza di un semitono (tasto +)">+</button>
         <button id="azzera" title="Tonalità originale">↺</button>
       </div>
+      <button id="altri" class="solo-compatto" aria-expanded="false" aria-controls="altri-comandi" title="Altri comandi: dimensione del testo, accordi, modifica, scaletta, colori">⋯</button>
+      <div id="altri-comandi" class="altri-comandi">
       <div class="gruppo" role="group" aria-label="Dimensione testo">
         <button id="piccolo" title="Testo più piccolo">A−</button>
         <button id="grande" title="Testo più grande">A+</button>
@@ -82,6 +84,7 @@
           <option value="classic">Classico</option>
           <option value="dark">Scuro</option>
         </select>
+      </div>
       </div>
     </nav>
     <section id="pannello-modifica" class="pannello-modifica" hidden>

@@ -1881,6 +1881,11 @@ $("scorri-veloce").onclick = () => cambiaVelocita(1);
 $("esporta-tag").onclick = esportaTag;
 $("azzera-filtri").onclick = () => { stato.filtri = []; salva(); aggiornaElenco(); };
 $("indietro").onclick = () => { location.hash = ""; };
+// sugli schermi stretti i comandi meno usati stanno dietro ⋯
+$("altri").onclick = () => {
+  const aperta = document.querySelector(".barra").classList.toggle("aperta");
+  $("altri").setAttribute("aria-expanded", aperta);
+};
 $("cerca").addEventListener("input", aggiornaElenco);
 $("cerca").addEventListener("keydown", e => {
   if (e.key === "Enter") {

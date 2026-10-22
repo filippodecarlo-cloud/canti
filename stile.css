@@ -426,3 +426,38 @@ body.in-modifica #in-scaletta { display: none; }
 /* editor: promemoria delle note, sempre visibile sotto il pentagramma */
 .pm-aiuto-note { font-size: 12.5px; line-height: 1.7; color: var(--tenue); margin: 0 0 8px; }
 .pm-aiuto-note code { background: var(--carta); padding: 0 4px; border-radius: 4px; color: var(--inchiostro); }
+
+/* --- tablet e telefono: intestazione compatta, più spazio per il canto -- */
+.solo-compatto { display: none; }
+.altri-comandi { display: contents; }
+@media (max-width: 1100px) {
+  .barra { flex-wrap: wrap; gap: 6px 8px; padding: 6px 0; }
+  .barra button, .barra select { min-height: 34px; }
+  .naviga-scaletta { flex: 1 1 auto; flex-basis: auto; order: 1; min-width: 0; }
+  .naviga-scaletta #pos-scaletta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #indietro { order: 0; }
+  .barra > .gruppo { order: 2; }
+  .tonalita { min-width: 72px; }
+  .solo-compatto { display: inline-block; order: 3; min-width: 40px; font-size: 18px; line-height: 1; }
+  .barra.aperta #altri { background: var(--pannello); }
+  .altri-comandi { display: none; order: 4; }
+  .barra.aperta .altri-comandi { display: flex; flex-basis: 100%; flex-wrap: wrap; gap: 6px 8px; padding-top: 2px; }
+  .altri-comandi .gruppo { flex-wrap: wrap; }
+  .altri-comandi select { max-width: 100%; }
+  .intestazione { padding: 10px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  #titolo { font-size: 24px; flex-basis: 100%; }
+  #sottotitolo { flex-basis: 100%; margin: 0; font-size: 14px; }
+  .info { margin: 0; font-size: 13px; }
+  .info:not(:has(:not(:empty, [hidden]))) { display: none; }
+  .tag-canto { margin: 0; gap: 4px; }
+  .tag-canto .chip { font-size: 11.5px; min-height: 22px; padding: 0 8px; }
+  #corpo > .melodia:first-child { margin-top: .6em; }
+}
+@media (max-width: 600px) {
+  #indietro .etichetta { display: none; }
+  .naviga-scaletta button { min-width: 36px; padding: 0 6px; }
+  .naviga-scaletta.alfabetico #pos-scaletta { font-size: 12px; }
+  .tonalita { min-width: 56px; font-size: 13px; }
+  .barra > .gruppo button { padding: 4px 9px; }
+}
+@media print { #altri { display: none !important; } .altri-comandi { display: contents !important; } }
