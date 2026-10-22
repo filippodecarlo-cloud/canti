@@ -81,6 +81,79 @@ function leggiTempo(testo, dest) {
   return dest;
 }
 
+/* ===== Tempo e ritmo ===================================================== */
+
+// Tempo = misura (4/4, 3/4…), ritmo = battiti al minuto (♩ = 80). Nel blocco melodia sono le
+// righe "tempo: 4/4" e "ritmo: 80"; nell'intestazione del canto {tempo: 4/4} e {ritmo: 80}.
+// Si leggono anche le forme vecchie: "tempo: 4/4 80", {time: 4/4}.
+const MISURE = ["", "2/4", "3/4", "4/4", "2/2", "3/8", "6/8", "9/8", "12/8"];
+
+function leggiTempoMelodia(blocco) {
+  const t = { metro: "", bpm: "" };
+  for (const m of blocco.matchAll(/^\s*(?:tempo|metro|ritmo|velocit\S*)\s*:(.*)$/gim)) leggiTempo(m[1], t);
+  return t;
+}
+
+function scriviTempoMelodia(blocco, { metro, bpm }) {
+  const righe = blocco.split("\n").filter(r => !/^\s*(?:metro|velocit\S*)\s*:/i.test(r));
+  for (const [chiave, valore] of [["tempo", metro], ["ritmo", bpm]]) {
+    const riga = `${chiave}: ${valore || ""}`.trimEnd();
+    const i = righe.findIndex(r => new RegExp(`^\\s*${chiave}\\s*:`, "i").test(r));
+    if (i >= 0) { righe[i] = riga; continue; }
+    const dopo = righe.findIndex(r => /^\s*(tonalit|tempo)\S*\s*:/i.test(r));
+    righe.splice(dopo >= 0 ? dopo + 1 : /^\{/.test(righe[0]) ? 1 : 0, 0, riga);
+  }
+  return righe.join("\n");
+}
+
+function leggiTempoCanto(testo) {
+  const t = { metro: "", bpm: "" };
+  for (const m of testo.matchAll(/^\{(?:time|tempo|ritmo):(.*)\}$/gim)) leggiTempo(m[1], t);
+  return t;
+}
+
+function scriviTempoCanto(testo, { metro, bpm }) {
+  testo = testo.replace(/^\{time:.*\}\n?/gim, "");
+  for (const [chiave, valore] of [["tempo", metro], ["ritmo", bpm]]) {
+    const riga = `{${chiave}:${valore ? " " + valore : ""}}`;
+    const re = new RegExp(`^\\{${chiave}:.*\\}$`, "im");
+    testo = re.test(testo) ? testo.replace(re, riga)
+      : testo.replace(/^(\{(?:key|title):.*\})$/im, `$1\n${riga}`);
+  }
+  return testo;
+}
+
+/** Menu della misura e casella dei battiti; cambia() riceve { metro, bpm }. */
+function controlliTempo(cambia) {
+  const box = el("div", "editor-tempo");
+  const metro = el("select");
+  for (const v of MISURE) {
+    const o = el("option", null, v || "libero");
+    o.value = v;
+    metro.append(o);
+  }
+  const bpm = el("input");
+  Object.assign(bpm, { type: "number", min: 30, max: 240, step: 1, placeholder: "—" });
+  const etMetro = el("label", null, "Tempo ");
+  const etBpm = el("label", null, "Ritmo ♩ = ");
+  etMetro.append(metro);
+  etBpm.append(bpm);
+  box.append(etMetro, etBpm);
+  const leggi = () => cambia({ metro: metro.value, bpm: bpm.value });
+  metro.onchange = leggi;
+  bpm.onchange = leggi;
+  const imposta = t => {
+    if (t.metro && ![...metro.options].some(o => o.value === t.metro)) {
+      const o = el("option", null, t.metro);
+      o.value = t.metro;
+      metro.append(o);
+    }
+    metro.value = t.metro;
+    if (document.activeElement !== bpm) bpm.value = t.bpm;
+  };
+  return { box, imposta };
+}
+
 /* ===== Melodia -> notazione ABC (per il pentagramma) ==================== */
 
 // alterazioni in chiave per ogni tonalità maggiore (semitono della tonica)
@@ -107,7 +180,7 @@ function leggiMelodia(righe) {
     const chiave = m ? normalizza(m[1]).trim() : "";
     const valore = m ? m[2].trim() : "";
     if (chiave === "tonalita") mel.tonalita = valore;
-    else if (["tempo", "metro", "velocita"].includes(chiave)) leggiTempo(valore, mel);
+    else if (["tempo", "metro", "ritmo", "velocita"].includes(chiave)) leggiTempo(valore, mel);
     else if (chiave === "note") mel.righe.push({ note: valore, testo: "" });
     else if (chiave === "testo") { if (mel.righe.length) mel.righe[mel.righe.length - 1].testo = valore; }
     else mel.errori.push(`riga non riconosciuta: "${r.trim()}"`);
@@ -225,7 +298,7 @@ function tonalitaEstesa(key) {
 function bloccoDaTrattini(sorgente) {
   const m = /\{\s*melodia_note\s*:\s*([^}]*)\}/i.exec(sorgente);
   const [ton, note = ""] = m[1].split("|").map(s => s.trim());
-  return `{start_of_melodia}\ntonalità: ${ton}\ntempo: 4/4\nnote: ${noteDaTrattini(note)}\ntesto:\n{end_of_melodia}`;
+  return `{start_of_melodia}\ntonalità: ${ton}\ntempo: 4/4\nritmo:\nnote: ${noteDaTrattini(note)}\ntesto:\n{end_of_melodia}`;
 }
 
 /* ===== Lettura del formato ChordPro ===================================== */
@@ -261,7 +334,7 @@ function leggiChordPro(testo, file) {
         case "artist": case "composer": case "autore": meta.artist = valore; break;
         case "youtube": case "link": meta.youtube = valore; break;
         case "key": meta.key = valore; break;
-        case "time": case "tempo": leggiTempo(valore, meta); break;
+        case "time": case "tempo": case "ritmo": leggiTempo(valore, meta); break;
         case "tags": meta.tags = valore.split(",").map(s => s.trim()).filter(Boolean); break;
         case "start_of_chorus": case "soc": sezione = { tipo: "ritornello", righe: [] }; blocchi.push(sezione); break;
         case "start_of_verse": case "sov": sezione = { tipo: "verso", righe: [] }; blocchi.push(sezione); break;
@@ -305,7 +378,7 @@ function leggiChordPro(testo, file) {
 
 // righe interne ai blocchi melodia/ABC: non sono testo da cercare
 function raccoltaRiga(r) {
-  return /^\s*(tonalit|tempo|metro|velocit|note|testo)\S*\s*:/i.test(r) || /^[A-Za-z]:/.test(r);
+  return /^\s*(tonalit|tempo|metro|ritmo|velocit|note|testo)\S*\s*:/i.test(r) || /^[A-Za-z]:/.test(r);
 }
 
 function normalizza(s) {
@@ -679,7 +752,7 @@ function disegna() {
     const nuova = el("button", "aggiungi-melodia", "✎ Scrivi la melodia");
     nuova.onclick = () => {
       const modello = `{start_of_melodia}\ntonalità: ${tonalitaEstesa(canto.meta.key) || "Do maggiore"}\n` +
-        `tempo: ${canto.meta.metro || "4/4"}${canto.meta.bpm ? " " + canto.meta.bpm : ""}\nnote: \ntesto: \n{end_of_melodia}`;
+        `tempo: ${canto.meta.metro || "4/4"}\nritmo: ${canto.meta.bpm || ""}\nnote: \ntesto: \n{end_of_melodia}`;
       nuova.replaceWith(disegnaMelodia(modello, canto, 0, false, true));
     };
     corpo.append(nuova);
@@ -836,49 +909,16 @@ function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false) {
     "1 semibreve, 2 minima, 4 semiminima, 8 croma, 16 semicroma, con il punto per la nota puntata (<code>sol4.</code>) · " +
     "senza numero vale la durata precedente · <b>pausa</b>: <code>p4</code>, <code>p2</code>… · " +
     "<b>ottava</b>: <code>'</code> sopra, <code>,</code> sotto (<code>sib,2</code>) · <b>battuta</b>: <code>|</code> · " +
-    "<b>tempo</b>: <code>4/4 80</code> (metro e battiti al minuto) · <b>testo</b>: sillabe divise da <code>-</code>, " +
+    "<b>tempo</b>: <code>tempo: 3/4</code> (la misura) · <b>ritmo</b>: <code>ritmo: 72</code> (battiti al minuto) · <b>testo</b>: sillabe divise da <code>-</code>, " +
     "una riga <code>testo:</code> sotto ogni riga <code>note:</code>.";
-  // metro e velocità dai menu: riscrivono la riga "tempo:" del blocco
-  const tempoBox = el("div", "editor-tempo");
-  const metro = el("select");
-  for (const v of ["", "2/4", "3/4", "4/4", "2/2", "3/8", "6/8", "9/8", "12/8"]) {
-    const o = el("option", null, v || "libero");
-    o.value = v;
-    metro.append(o);
-  }
-  const bpm = el("input");
-  Object.assign(bpm, { type: "number", min: 30, max: 240, step: 1, placeholder: "—" });
-  const etMetro = el("label", null, "Tempo ");
-  const etBpm = el("label", null, "♩ = ");
-  etMetro.append(metro);
-  etBpm.append(bpm);
-  tempoBox.append(etMetro, etBpm);
-  tempoBox.hidden = /start_of_abc|soa/i.test(sorgente);
-  const leggiTempoArea = () => {
-    const riga = /^\s*(?:tempo|metro|velocit\S*)\s*:(.*)$/im.exec(area.value);
-    const t = leggiTempo(riga ? riga[1] : "", { metro: "", bpm: "" });
-    if (t.metro && ![...metro.options].some(o => o.value === t.metro)) {
-      const o = el("option", null, t.metro);
-      o.value = t.metro;
-      metro.append(o);
-    }
-    metro.value = t.metro;
-    bpm.value = t.bpm;
-  };
-  const scriviTempo = () => {
-    const riga = "tempo: " + [metro.value, bpm.value].filter(Boolean).join(" ");
-    const righe = area.value.split("\n");
-    const i = righe.findIndex(r => /^\s*(tempo|metro|velocit)/i.test(r));
-    if (i >= 0) righe[i] = riga;
-    else {
-      const t = righe.findIndex(r => /^\s*tonalit/i.test(r));
-      righe.splice(t >= 0 ? t + 1 : /^\{/.test(righe[0]) ? 1 : 0, 0, riga);
-    }
-    area.value = righe.join("\n");
+  // tempo (misura) e ritmo (battiti al minuto) dai menu: riscrivono le righe del blocco
+  const controlli = controlliTempo(t => {
+    area.value = scriviTempoMelodia(area.value, t);
     rendi(area.value, 0);
-  };
-  metro.onchange = scriviTempo;
-  bpm.onchange = scriviTempo;
+  });
+  const tempoBox = controlli.box;
+  tempoBox.hidden = /start_of_abc|soa/i.test(sorgente);
+  const leggiTempoArea = () => controlli.imposta(leggiTempoMelodia(area.value));
 
   const comandi = el("div", "editor-comandi");
   const copia = el("button", null, "Copia per il file");
@@ -1234,8 +1274,8 @@ const MODELLO = `{title: Nuovo canto}
 {key: Re}
 {artist:}
 {youtube:}
-{time:}
 {tempo:}
+{ritmo:}
 {tags:}
 
 {intro: Re La Si- Sol}
@@ -1269,6 +1309,10 @@ async function modificaCanto(canto) {
   $("pannello-modifica").hidden = false;
   document.body.classList.add("in-modifica");
   anteprima();
+  // il cursore parte dalle note della melodia (o dall'inizio), non dalla fine del testo
+  const inizio = Math.max(0, area.value.search(/^note:/m));
+  area.setSelectionRange(inizio, inizio);
+  area.scrollTop = 0;
   area.focus();
   window.scrollTo(0, 0);
 }
@@ -1280,7 +1324,26 @@ function anteprima() {
   disegnaTag();
   disegna();
   disegnaTagEditor();
+  // la melodia sta subito sopra il testo: si scrive e si ascolta senza scorrere la pagina
+  const melodie = $("pm-melodia");
+  melodie.replaceChildren(...canto.blocchi.filter(b => b.tipo === "melodia")
+    .map(b => disegnaMelodia(b.sorgente, canto, 0, false)));
+  const blocco = bloccoMelodia($("pm-testo").value);
+  tempoEditor.imposta(blocco ? leggiTempoMelodia(blocco) : leggiTempoCanto($("pm-testo").value));
 }
+
+/** Il primo blocco melodia del testo, se c'è. */
+const bloccoMelodia = testo => (/\{start_of_melodia\}[\s\S]*?\{end_of_melodia\}/i.exec(testo) || [])[0];
+
+// tempo e ritmo nell'editor: valgono per la melodia se c'è, altrimenti per tutto il canto
+const tempoEditor = controlliTempo(t => {
+  const area = $("pm-testo");
+  const blocco = bloccoMelodia(area.value);
+  area.value = blocco ? area.value.replace(blocco, () => scriviTempoMelodia(blocco, t))
+    : scriviTempoCanto(area.value, t);
+  anteprima();
+});
+$("pm-tempo").append(tempoEditor.box);
 
 /* --- nell'editor: i tag si scelgono toccandoli, e finiscono nella riga {tags: …} --- */
 

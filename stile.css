@@ -48,7 +48,7 @@ button {
   padding: 6px 11px; cursor: pointer; min-height: 36px;
 }
 button:hover { border-color: var(--tenue); }
-.barra select, .editor select, .editor input {
+.barra select, .editor select, .editor input, #pm-tempo select, #pm-tempo input {
   font: inherit; font-size: 14px; color: inherit; background: var(--carta);
   border: 1px solid var(--linea); border-radius: 8px; padding: 6px 8px; min-height: 36px;
 }
@@ -346,3 +346,9 @@ body.online .solo-locale { display: none; }
 .pm-guida code, .pm-guida pre { background: var(--carta); color: var(--inchiostro); border-radius: 4px; }
 .pm-guida code { padding: 0 4px; }
 .pm-guida pre { padding: 8px 10px; font-size: 12.5px; overflow-x: auto; }
+
+/* in modifica la melodia si vede sopra il testo, non più in mezzo al canto */
+#pm-melodia .melodia { margin: 0 0 8px; background: var(--carta); }
+body.in-modifica #corpo .melodia { display: none; }
+#pm-tempo .editor-tempo { margin: 0 0 8px; }
+#pm-tempo input { width: 76px; }
