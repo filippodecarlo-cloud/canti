@@ -401,3 +401,8 @@ body.in-modifica #corpo .melodia { display: none; }
 .naviga-scaletta button { min-width: 44px; font-size: 20px; padding: 0 10px; }
 .naviga-scaletta .esci { min-width: 36px; font-size: 16px; color: var(--tenue); }
 @media print { .naviga-scaletta, .schede { display: none !important; } }
+
+/* editor: tonalità con cui il canto si apre per tutti */
+.pm-tonalita { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 14px; color: var(--tenue); }
+.pm-tonalita b { color: var(--rubrica); min-width: 90px; text-align: center; }
+.pm-tonalita button { min-height: 32px; padding: 2px 10px; font-size: 14px; }

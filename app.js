@@ -334,6 +334,7 @@ function leggiChordPro(testo, file) {
         case "artist": case "composer": case "autore": meta.artist = valore; break;
         case "youtube": case "link": meta.youtube = valore; break;
         case "key": meta.key = valore; break;
+        case "transpose": case "trasposizione": meta.trasposizione = nelGiro(parseInt(valore, 10) || 0); break;
         case "time": case "tempo": case "ritmo": leggiTempo(valore, meta); break;
         case "tags": meta.tags = valore.split(",").map(s => s.trim()).filter(Boolean); break;
         case "start_of_chorus": case "soc": sezione = { tipo: "ritornello", righe: [] }; blocchi.push(sezione); break;
@@ -702,24 +703,34 @@ function intestazione(canto) {
   document.title = m.title + " · Chi canta prega due volte";
 }
 
+/** "Re" trasposto di n -> "Mi" (o "E" in notazione internazionale) */
+function nomeTonalita(canto, n) {
+  const key = (canto.meta.key || "").replace(/\s*(maggiore|minore)/i, m => (/minore/i.test(m) ? "-" : ""));
+  if (!key) return n ? `${n > 0 ? "+" : ""}${n}` : "originale";
+  return trasponiAccordo(key, n, usaBemolli(leggiTonalita(canto.meta.key), n), stato.int);
+}
+
 function disegna() {
   const canto = stato.corrente;
   if (!canto) return;
-  const n = stato.trasp[canto.id] || 0;
+  const n = trasposizioneDi(canto);
   const ton = leggiTonalita(canto.meta.key);
   const bemolli = usaBemolli(ton, n);
   const acc = a => trasponiAccordo(a, n, bemolli, stato.int);
 
-  // indicatore di tonalità
+  // indicatore di tonalità: lo scarto è rispetto all'originale del PDF
   const tonEl = $("tonalita");
   tonEl.replaceChildren();
   if (canto.meta.key) {
-    const nuova = acc(canto.meta.key.replace(/\s*(maggiore|minore)/i, m => (/minore/i.test(m) ? "-" : "")));
-    tonEl.append(el("b", null, nuova));
+    tonEl.append(el("b", null, nomeTonalita(canto, n)));
     if (n) tonEl.append(document.createTextNode(` (${n > 0 ? "+" : ""}${n})`));
   } else {
     tonEl.textContent = n ? `${n > 0 ? "+" : ""}${n}` : "originale";
   }
+  const salvata = canto.meta.trasposizione || 0;
+  tonEl.title = n === salvata ? (salvata ? "Tonalità salvata nel canto" : "Tonalità originale")
+    : `Tonalità scelta su questo dispositivo (salvata nel canto: ${nomeTonalita(canto, salvata)})`;
+  $("azzera").title = salvata ? "Torna alla tonalità salvata nel canto" : "Tonalità originale";
 
   const corpo = $("corpo");
   corpo.replaceChildren();
@@ -1332,6 +1343,33 @@ function anteprima() {
     .map(b => disegnaMelodia(b.sorgente, canto, 0, false)));
   const blocco = bloccoMelodia($("pm-testo").value);
   tempoEditor.imposta(blocco ? leggiTempoMelodia(blocco) : leggiTempoCanto($("pm-testo").value));
+  // tonalità con cui il canto si aprirà per tutti
+  const base = canto.meta.trasposizione || 0;
+  $("pm-ton").textContent = nomeTonalita(canto, base) + (base ? ` (${base > 0 ? "+" : ""}${base})` : " (originale)");
+  const qui = inModifica.id ? stato.trasp[inModifica.id] : undefined;
+  const attuale = $("pm-ton-attuale");
+  attuale.hidden = qui === undefined || qui === base;
+  if (!attuale.hidden) attuale.textContent = `Usa quella di questo dispositivo: ${nomeTonalita(canto, qui)}`;
+}
+
+/* --- nell'editor: la tonalità con cui il canto si apre per tutti, riga {transpose: …} --- */
+
+function conTrasposizione(testo, n) {
+  const re = /^\{(?:transpose|trasposizione):.*\}$/im;
+  if (!n) return testo.replace(/^\{(?:transpose|trasposizione):.*\}\n?/im, "");
+  const riga = `{transpose: ${n > 0 ? "+" : ""}${n}}`;
+  if (re.test(testo)) return testo.replace(re, riga);
+  return /^\{key:.*\}$/im.test(testo) ? testo.replace(/^(\{key:.*\})$/im, `$1\n${riga}`)
+    : testo.replace(/^(\{title:.*\})$/im, `$1\n${riga}`);
+}
+
+/** delta: semitoni in più o in meno; 0 = tonalità originale del PDF; null + valore = quella indicata. */
+function cambiaTrasposizioneEditor(delta, valore) {
+  const area = $("pm-testo");
+  const base = leggiChordPro(area.value, "x").meta.trasposizione || 0;
+  const n = valore !== undefined ? valore : delta === 0 ? 0 : nelGiro(base + delta);
+  area.value = conTrasposizione(area.value, n);
+  anteprima();
 }
 
 /** Il primo blocco melodia del testo, se c'è. */
@@ -1411,7 +1449,11 @@ async function salvaModifica() {
   const titolo = (/^\{title:\s*(.*?)\s*\}$/m.exec(testo) || [])[1];
   if (!titolo) { avviso("Manca il titolo: {title: …}"); return; }
   const id = inModifica.id || nomeFile(titolo);
+  const primaBase = (inModifica.originale && inModifica.originale.meta.trasposizione) || 0;
+  const nuovaBase = leggiChordPro(testo, id).meta.trasposizione || 0;
   if (await salvaCanto(id, testo, `${inModifica.id ? "Modifica" : "Nuovo canto"}: ${titolo}`)) {
+    // cambiata la tonalità per tutti: anche qui il canto riparte da quella
+    if (nuovaBase !== primaBase && id in stato.trasp) { delete stato.trasp[id]; salva(); }
     chiudiModificaCanto();
     riapri(id);
   }
@@ -1684,13 +1726,23 @@ function vaiInScaletta(d) {
 
 /* ===== Comandi ========================================================== */
 
+const nelGiro = n => ((n + 6) % 12 + 12) % 12 - 6;  // da -6 a +5 semitoni
+
+/** Trasposizione con cui si vede il canto: quella scelta su questo dispositivo, se c'è,
+    altrimenti quella salvata nel canto ({transpose: …}). In modifica conta solo quella salvata. */
+function trasposizioneDi(canto) {
+  if (!inModifica && canto.id in stato.trasp) return stato.trasp[canto.id];
+  return canto.meta.trasposizione || 0;
+}
+
+/** − e + cambiano la tonalità solo su questo dispositivo; ↺ torna a quella salvata nel canto. */
 function trasponi(delta) {
   const c = stato.corrente;
   if (!c) return;
-  let n = (stato.trasp[c.id] || 0) + delta;
-  if (n > 6) n -= 12;
-  if (n < -6) n += 12;
-  if (delta === 0 || n === 0) delete stato.trasp[c.id];
+  if (inModifica) { cambiaTrasposizioneEditor(delta); return; }
+  const salvata = c.meta.trasposizione || 0;
+  const n = delta === 0 ? salvata : nelGiro(trasposizioneDi(c) + delta);
+  if (n === salvata) delete stato.trasp[c.id];
   else stato.trasp[c.id] = n;
   salva();
   disegna();
@@ -1763,6 +1815,10 @@ $("pm-annulla").onclick = () => {
   mostraCanto(originale || null);
 };
 $("pm-elimina").onclick = eliminaCanto;
+$("pm-ton-giu").onclick = () => cambiaTrasposizioneEditor(-1);
+$("pm-ton-su").onclick = () => cambiaTrasposizioneEditor(1);
+$("pm-ton-orig").onclick = () => cambiaTrasposizioneEditor(0);
+$("pm-ton-attuale").onclick = () => cambiaTrasposizioneEditor(null, stato.trasp[inModifica.id]);
 $("blocco-form").onsubmit = async e => {
   e.preventDefault();
   const chiave = chiaveDalLink($("blocco-input").value);

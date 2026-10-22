@@ -88,6 +88,14 @@
         ritornello tra <code>{start_of_chorus}</code> e <code>{end_of_chorus}</code>. L’anteprima è qui sotto.</p>
       <div id="pm-melodia"></div>
       <div id="pm-tempo"></div>
+      <div class="pm-tonalita" role="group" aria-label="Tonalità per tutti">
+        <span>Tonalità per tutti</span>
+        <button id="pm-ton-giu" type="button" title="Abbassa di un semitono">−</button>
+        <b id="pm-ton"></b>
+        <button id="pm-ton-su" type="button" title="Alza di un semitono">+</button>
+        <button id="pm-ton-orig" type="button" title="Torna alla tonalità del PDF">Originale</button>
+        <button id="pm-ton-attuale" type="button" hidden></button>
+      </div>
       <textarea id="pm-testo" spellcheck="false" autocapitalize="off" aria-label="Testo del canto"></textarea>
       <details class="pm-sezione" open>
         <summary>Tag <span id="pm-tag-scelti"></span></summary>
@@ -98,7 +106,7 @@
         <summary>Guida al formato</summary>
         <div class="pm-guida">
           <p><b>Intestazione</b>: <code>{title: …}</code> titolo, <code>{subtitle: …}</code>, <code>{artist: …}</code> autore,
-            <code>{key: Re}</code> tonalità, <code>{youtube: link}</code>, <code>{tempo: 4/4}</code> la misura, <code>{ritmo: 80}</code> i battiti al minuto.</p>
+            <code>{key: Re}</code> tonalità, <code>{youtube: link}</code>, <code>{tempo: 4/4}</code> la misura, <code>{ritmo: 80}</code> i battiti al minuto, <code>{transpose: +2}</code> la tonalità con cui il canto si apre per tutti (si sceglie con «Tonalità per tutti», in cima all’editor).</p>
           <p><b>Accordi</b>: tra quadre subito prima della sillaba, in notazione italiana: <code>[Re]Santo, [Si-]san[Sol]to</code>
             (<code>Si-</code> minore, <code>Sib7+</code>, <code>La4</code>, <code>La/Do#</code>).</p>
           <p><b>Parti</b>: strofa tra <code>{start_of_verse}</code> e <code>{end_of_verse}</code>; ritornello tra
