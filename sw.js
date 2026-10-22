@@ -1,7 +1,7 @@
 // Rende l'app installabile e utilizzabile anche senza connessione.
-const CACHE = "canti-v1";
+const CACHE = "canti-v2";
 const BASE = ["./", "index.html", "app.js", "stile.css", "manifest.webmanifest",
-  "icone/icona-192.png", "icone/icona-512.png"];
+  "icone/icona-192.png", "icone/icona-512.png", "icone/copertina.jpg"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(BASE)).then(() => self.skipWaiting()));

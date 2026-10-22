@@ -15,7 +15,7 @@
 <aside id="elenco">
   <header class="elenco-testa">
     <div class="elenco-titolo">
-      <h1>Chi canta prega due volte</h1>
+      <h1><a href="#" id="torna-copertina" title="Torna alla copertina">Chi canta prega due volte</a><small>Sant’Agostino</small></h1>
       <button id="nuovo-canto" class="solo-online" title="Aggiungi un canto (serve la password)">+ Canto</button>
     </div>
     <input id="cerca" type="search" placeholder="Cerca titolo o parole…" autocomplete="off" aria-label="Cerca un canto">
@@ -27,8 +27,14 @@
 </aside>
 
 <main id="canto">
-  <div id="vuoto" class="vuoto">
-    <p>Scegli un canto dall’elenco<br>oppure cerca per titolo o per parole del testo.</p>
+  <div id="vuoto" class="copertina">
+    <div class="copertina-pagina">
+      <h2>Chi canta prega due volte</h2>
+      <p class="citazione">Sant’Agostino</p>
+      <img src="icone/copertina.jpg" alt="Due figure, uno sposo e una sposa, con una fiamma e delle note musicali" width="900" height="869">
+      <p class="copertina-aiuto solo-desktop">Scegli un canto dall’elenco oppure cerca per titolo o per parole del testo.</p>
+      <button id="entra" class="primario solo-mobile">Apri i canti</button>
+    </div>
   </div>
   <article id="foglio" hidden>
     <nav class="barra">
@@ -86,8 +92,10 @@
 </main>
 
 <section id="blocco" class="blocco-chiave" hidden>
-  <div>
+  <div class="copertina-pagina">
     <h1>Chi canta prega due volte</h1>
+    <p class="citazione">Sant’Agostino</p>
+    <img src="icone/copertina.jpg" alt="" width="900" height="869">
     <p id="blocco-msg"></p>
     <form id="blocco-form">
       <input id="blocco-input" placeholder="Incolla qui il link o la chiave" autocapitalize="off" autocomplete="off" spellcheck="false">

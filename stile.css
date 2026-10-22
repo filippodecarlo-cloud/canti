@@ -79,7 +79,25 @@ mark { background: var(--evidenzia); color: inherit; border-radius: 2px; }
 
 /* --- foglio del canto ------------------------------------------------- */
 #canto { min-width: 0; }
-.vuoto { display: grid; place-items: center; height: 100vh; color: var(--tenue); text-align: center; line-height: 1.6; }
+.copertina { display: grid; place-items: center; min-height: 100vh; padding: 32px 16px; }
+/* come la prima pagina del libretto: titolo, filetto, citazione a destra, immagine */
+.copertina-pagina { width: min(480px, 100%); text-align: center; }
+.copertina-pagina h1, .copertina-pagina h2 {
+  font-family: var(--serif); font-weight: 400; font-size: clamp(28px, 6vw, 40px); line-height: 1.15;
+  margin: 0; padding-bottom: 10px; border-bottom: 1px solid var(--tenue);
+}
+.citazione { margin: 6px 0 20px; text-align: right; font-size: 14px; letter-spacing: .06em; color: var(--tenue); }
+.copertina-pagina img {
+  display: block; width: 100%; height: auto; border-radius: 6px;
+  border: 1px solid var(--linea); box-shadow: 0 6px 24px rgb(0 0 0 / .08);
+}
+.copertina-aiuto { color: var(--tenue); line-height: 1.6; margin: 20px 0 0; }
+#entra { margin-top: 24px; font-size: 17px; padding: 10px 28px; }
+.elenco-testa h1 a { color: inherit; text-decoration: none; }
+.elenco-testa h1 small {
+  display: block; font-family: var(--sans); font-size: 11px; font-weight: 400;
+  letter-spacing: .06em; color: var(--tenue); margin-top: 3px;
+}
 #foglio { max-width: 860px; margin: 0 auto; padding: 0 28px 80px; }
 .barra {
   position: sticky; top: 0; z-index: 2; background: var(--carta);
@@ -204,6 +222,10 @@ details.rit-rif[open] summary { margin-bottom: .4em; }
   body.con-canto #elenco { display: none; }
   body:not(.con-canto) #canto { display: none; }
   .solo-mobile { display: inline-block; }
+  .solo-desktop { display: none; }
+  /* all'apertura sul telefono: prima la copertina, poi l'elenco */
+  body.in-copertina:not(.con-canto) #canto { display: block; }
+  body.in-copertina:not(.con-canto) #elenco { display: none; }
   #foglio { padding: 0 16px 60px; }
   #titolo { font-size: 27px; }
   .tonalita { min-width: 90px; }
@@ -228,7 +250,8 @@ button.pericolo { color: var(--rubrica); margin-left: auto; }
   position: fixed; inset: 0; z-index: 10; background: var(--carta);
   display: grid; place-items: center; padding: 16px; text-align: center;
 }
-.blocco-chiave h1 { font-family: var(--serif); font-weight: 600; font-size: 28px; margin: 0 0 12px; }
+.blocco-chiave { overflow-y: auto; }
+.blocco-chiave img { max-width: 320px; margin: 0 auto; }
 .blocco-chiave p { color: var(--tenue); }
 #blocco-form { display: flex; gap: 8px; max-width: 420px; margin: 16px auto 0; }
 #blocco-input {

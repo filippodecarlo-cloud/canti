@@ -1309,7 +1309,21 @@ $("blocco-form").onsubmit = async e => {
   if (await sblocca(chiave)) apriDaIndirizzo();
 };
 
+// sul telefono, all'apertura, prima la copertina (una volta per sessione)
+$("entra").onclick = () => {
+  document.body.classList.remove("in-copertina");
+  try { sessionStorage.setItem("copertina-vista", "1"); } catch { /* niente */ }
+};
+$("torna-copertina").onclick = e => {
+  e.preventDefault();
+  document.body.classList.add("in-copertina");
+  location.hash = "";
+};
+
 async function avvia() {
+  let vista = false;
+  try { vista = !!sessionStorage.getItem("copertina-vista"); } catch { /* niente */ }
+  if (!vista && !location.hash.startsWith("#/")) document.body.classList.add("in-copertina");
   if (window.CANTI) {
     impostaCanti(window.CANTI);   // versione locale: canti in chiaro da canti.js
   } else {
