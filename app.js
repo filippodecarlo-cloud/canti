@@ -1189,6 +1189,17 @@ async function github(percorso, opzioni = {}) {
   return res.json();
 }
 
+/**
+ * Ultima versione di un file del repository: { sha, byte }.
+ * I byte si prendono dal "blob" di git: il campo content di /contents a volte scambia i file
+ * cifrati per testo e li restituisce trasformati (così non si potrebbero più decifrare).
+ */
+async function leggiDaGitHub(percorso) {
+  const info = await github(`contents/${percorso}`);
+  const blob = await github(`git/blobs/${info.sha}`);
+  return { sha: info.sha, byte: daBase64(blob.content) };
+}
+
 /** Sblocca le modifiche: chiede la password (la prima volta fa configurare il token). */
 async function sbloccaModifiche() {
   if (sito.token) return true;
@@ -1267,8 +1278,8 @@ async function salvaCanto(id, testo, messaggio) {
   if (!(await sbloccaModifiche())) return false;
   avviso("Salvataggio…");
   try {
-    const attuale = await github("contents/dati/canti.bin");
-    const elenco = await apriCifrato(daBase64(attuale.content));
+    const attuale = await leggiDaGitHub("dati/canti.bin");
+    const elenco = await apriCifrato(attuale.byte);
     const i = elenco.findIndex(c => c.file === id);
     if (testo === null) { if (i >= 0) elenco.splice(i, 1); }
     else if (i >= 0) elenco[i].testo = testo;
@@ -1528,9 +1539,9 @@ async function salvaScalette(cambia, messaggio) {
   avviso("Salvataggio…");
   try {
     let attuale = null;
-    try { attuale = await github("contents/dati/scalette.bin"); }
+    try { attuale = await leggiDaGitHub("dati/scalette.bin"); }
     catch (e) { if (!/404/.test(e.message)) throw e; }
-    const elenco = cambia(attuale ? await apriScaletteCifrate(daBase64(attuale.content)) : []);
+    const elenco = cambia(attuale ? await apriScaletteCifrate(attuale.byte) : []);
     const byte = await cifra(sito.chiave, await gzip(codifica(JSON.stringify({ scalette: elenco })), true), "scalette");
     await github("contents/dati/scalette.bin", {
       method: "PUT",
