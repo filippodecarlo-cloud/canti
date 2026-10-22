@@ -556,8 +556,36 @@ function aggiornaElenco() {
     const riga = termini.length && !nelTitolo && c.righeTesto.find(r => termini.some(t => normalizza(r).includes(t)));
     const dettaglio = riga || [c.meta.artist, c.meta.subtitle].filter(Boolean).join(" · ");
     if (dettaglio) a.append(evidenzia(dettaglio, termini, "r-dettaglio"));
+    // i tag che corrispondono alla ricerca: si vede perché il canto è stato trovato
+    const tagCorrispondenti = termini.length ? ordinaTag(tagDi(c)).filter(t => termini.some(x => normalizza(t).includes(x))) : [];
+    if (tagCorrispondenti.length) {
+      const box = el("span", "r-tag");
+      for (const t of tagCorrispondenti) box.append(coloraTag(el("span", "chip mini", t), t));
+      a.append(box);
+    }
     li.append(a);
     lista.append(li);
+  }
+
+  // tag che corrispondono a quello che si sta scrivendo: un tocco e diventano un filtro
+  const suggeriti = $("tag-suggeriti");
+  suggeriti.replaceChildren();
+  const simili = termini.length
+    ? tags.map(([t]) => t).filter(t => !stato.filtri.includes(t) && termini.every(x => normalizza(t).includes(x)))
+    : [];
+  if (simili.length) {
+    suggeriti.append(el("span", "suggeriti-nome", "Filtra per tag:"));
+    for (const t of simili) {
+      const b = coloraTag(el("button", "chip filtro", t), t);
+      b.title = `Mostra solo i canti con il tag ${t}`;
+      b.onclick = () => {
+        stato.filtri = [...stato.filtri, t];
+        $("cerca").value = "";
+        salva();
+        aggiornaElenco();
+      };
+      suggeriti.append(b);
+    }
   }
   const filtrato = termini.length || stato.filtri.length;
   $("conteggio").textContent = filtrato
