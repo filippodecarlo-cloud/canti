@@ -356,19 +356,9 @@ const el = (tag, cls, testo) => {
 const tagDi = c => (!sito.attivo && stato.tag[c.id]) || c.meta.tags;
 const stessiTag = (a, b) => a.length === b.length && a.every(t => b.includes(t));
 
-async function impostaTag(canto, tags) {
+/** Solo nella copia sul PC: online i tag si cambiano dentro ✎ Modifica. */
+function impostaTag(canto, tags) {
   const puliti = [...new Set(tags.map(t => t.trim()).filter(Boolean))];
-  if (sito.attivo) {
-    // online i tag si cambiano solo con la password, e si salvano direttamente nel canto
-    if (!(await sbloccaModifiche())) { disegnaTag(); return; }
-    const riga = `{tags: ${puliti.join(", ")}}`;
-    const testo = testoDi(canto.id);
-    const nuovo = /^\{tags:.*\}$/m.test(testo) ? testo.replace(/^\{tags:.*\}$/m, riga)
-      : testo.replace(/^(\{title:.*\})$/m, `$1\n${riga}`);
-    delete stato.tag[canto.id];
-    if (await salvaCanto(canto.id, nuovo, `Tag: ${canto.meta.title}`)) riapri(canto.id);
-    return;
-  }
   if (stessiTag(puliti, canto.meta.tags)) delete stato.tag[canto.id];
   else stato.tag[canto.id] = puliti;
   salva();
@@ -437,13 +427,14 @@ function passaFiltri(canto, salvoGruppo) {
   return [...perGruppo.values()].every(scelti => scelti.some(f => tags.includes(f)));
 }
 
-/** I tag del canto aperto: si tolgono con × e si aggiungono con "+ tag" (online, dopo la password). */
+/** I tag del canto aperto. Nella copia sul PC si tolgono con × e si aggiungono con "+ tag";
+    online si vedono soltanto (si cambiano dentro ✎ Modifica). */
 function disegnaTag() {
   const canto = stato.corrente;
   const box = $("tag-canto");
   box.replaceChildren();
   if (!canto) return;
-  const modificabili = !sito.attivo || !!sito.token;
+  const modificabili = !sito.attivo;
   for (const t of ordinaTag(tagDi(canto))) {
     const chip = coloraTag(el("span", "chip", t), t);
     chip.title = gruppoDi(t);
@@ -455,13 +446,7 @@ function disegnaTag() {
     }
     box.append(chip);
   }
-  if (!modificabili) {
-    const sblocca = el("button", "chip chip-nuovo", "✎ tag");
-    sblocca.title = "Modifica i tag (serve la password)";
-    sblocca.onclick = async () => { if (await sbloccaModifiche()) disegnaTag(); };
-    if (!inModifica) box.append(sblocca);
-    return;
-  }
+  if (!modificabili) return;
   const piu = el("button", "chip chip-nuovo", "+ tag");
   piu.onclick = () => {
     const input = el("input", "chip-input");
@@ -689,7 +674,8 @@ function disegna() {
     }
   }
 
-  if (!canto.blocchi.some(b => b.tipo === "melodia")) {
+  // online si modifica solo con ✎ Modifica: niente pulsanti di modifica nel foglio
+  if (!sito.attivo && !canto.blocchi.some(b => b.tipo === "melodia")) {
     const nuova = el("button", "aggiungi-melodia", "✎ Scrivi la melodia");
     nuova.onclick = () => {
       const modello = `{start_of_melodia}\ntonalità: ${tonalitaEstesa(canto.meta.key) || "Do maggiore"}\n` +
@@ -898,24 +884,16 @@ function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false) {
   const copia = el("button", null, "Copia per il file");
   const chiudi = el("button", null, "Chiudi");
   comandi.append(copia, chiudi);
-  let nota = "Questa è la copia sul PC: da qui non si salva su GitHub. Per salvare online premi «Copia per il file», " +
-    `apri il canzoniere dal sito (${SITO_ONLINE}), cerca il canto e incolla la melodia con ✎ Modifica → Salva nel canto. ` +
+  const nota = "Questa è la copia sul PC: da qui non si salva su GitHub. Per salvare online premi «Copia per il file», " +
+    `apri il canzoniere dal sito (${SITO_ONLINE}), cerca il canto e incolla la melodia con ✎ Modifica. ` +
     `In alternativa incollala nel file canti/${canto.id}.cho e lancia pubblica.py.`;
-  if (sito.attivo) {
-    // online la melodia si salva direttamente nel canto (serve la password)
-    const salvaM = el("button", "primario", "Salva nel canto");
-    salvaM.onclick = async () => {
-      const testo = testoDi(canto.id);
-      let nuovo;
-      if (apriEditor) nuovo = inserisciMelodia(testo, area.value);
-      else if (testo.includes(sorgente)) nuovo = testo.replace(sorgente, area.value);
-      else { avviso("Non trovo la melodia nel testo del canto: modificala con ✎ Modifica canto."); return; }
-      if (await salvaCanto(canto.id, nuovo, `Melodia: ${canto.meta.title}`)) riapri(canto.id);
-    };
-    copia.replaceWith(salvaM);
-    nota = "Con «Salva nel canto» la melodia viene salvata online (serve la password per le modifiche).";
-  }
   editor.append(tempoBox, area, aiuto, comandi, el("p", "editor-nota", nota));
+
+  // online la melodia si cambia, come tutto il resto, solo con ✎ Modifica del canto
+  if (sito.attivo) {
+    rendi(sorgente, n);
+    return box;
+  }
 
   const modifica = el("button", null, "✎ Modifica");
   testa.append(modifica);
@@ -1244,15 +1222,6 @@ function riapri(id) {
   else location.hash = canto ? "#/" + id : "";
 }
 
-/** Inserisce un blocco melodia dopo l'intestazione del canto (le direttive iniziali). */
-function inserisciMelodia(testo, blocco) {
-  const righe = testo.split("\n");
-  let i = 0;
-  while (i < righe.length && /^\{[^}]*\}\s*$/.test(righe[i]) && !/start_of/.test(righe[i])) i++;
-  righe.splice(i, 0, "", blocco.trim());
-  return righe.join("\n");
-}
-
 function nomeFile(titolo) {
   const base = titolo.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "canto";
@@ -1310,6 +1279,59 @@ function anteprima() {
   intestazione(canto);
   disegnaTag();
   disegna();
+  disegnaTagEditor();
+}
+
+/* --- nell'editor: i tag si scelgono toccandoli, e finiscono nella riga {tags: …} --- */
+
+function tagNelTesto(testo) {
+  const m = /^\{tags:(.*)\}$/m.exec(testo);
+  return m ? m[1].split(",").map(t => t.trim()).filter(Boolean) : [];
+}
+
+function conTag(testo, tags) {
+  const riga = tags.length ? `{tags: ${tags.join(", ")}}` : "{tags:}";
+  return /^\{tags:.*\}$/m.test(testo) ? testo.replace(/^\{tags:.*\}$/m, riga)
+    : testo.replace(/^(\{title:.*\})$/m, `$1\n${riga}`);
+}
+
+function cambiaTagEditor(tags) {
+  const area = $("pm-testo");
+  area.value = conTag(area.value, tags);
+  anteprima();
+}
+
+function disegnaTagEditor() {
+  const scelti = tagNelTesto($("pm-testo").value);
+  const box = $("pm-tag");
+  box.replaceChildren();
+  const tutti = ordinaTag(new Set([...GRUPPI_TAG.flatMap(([, t]) => t), ...tuttiTag().map(([t]) => t), ...scelti]));
+  const gruppi = new Map();
+  for (const t of tutti) gruppi.set(gruppoDi(t), [...(gruppi.get(gruppoDi(t)) || []), t]);
+  for (const [gruppo, suoi] of gruppi) {
+    const riga = el("div", "gruppo-filtri");
+    riga.append(el("div", "gruppo-nome", gruppo));
+    for (const t of suoi) {
+      const b = coloraTag(el("button", "chip filtro", t), t);
+      b.type = "button";
+      b.setAttribute("aria-pressed", scelti.includes(t));
+      b.onclick = () => {
+        const attuali = tagNelTesto($("pm-testo").value);
+        cambiaTagEditor(attuali.includes(t) ? attuali.filter(x => x !== t) : [...attuali, t]);
+      };
+      riga.append(b);
+    }
+    box.append(riga);
+  }
+  const nuovo = el("input", "chip-input");
+  nuovo.placeholder = "nuovo tag, poi Invio";
+  nuovo.onkeydown = e => {
+    if (e.key !== "Enter" || !nuovo.value.trim()) return;
+    e.preventDefault();
+    cambiaTagEditor([...tagNelTesto($("pm-testo").value), nuovo.value.trim()]);
+  };
+  box.append(nuovo);
+  $("pm-tag-scelti").textContent = scelti.length ? `(${scelti.length})` : "";
 }
 
 function chiudiModificaCanto() {
