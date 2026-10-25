@@ -1093,6 +1093,8 @@ function finestraRitmo(battendo = false) {
   box.append(pad);
   box.append(el("p", "finestra-testo", "Dopo tre tocchi il ritmo si scrive da solo; se ti fermi due secondi si ricomincia. " +
     `Ritmo salvato nel canto: ${delCanto ? "♩ = " + delCanto : "nessuno"}.`));
+  const suTastiera = el("p", "finestra-testo ritmo-tastiera");
+  box.append(suTastiera);
 
   const comandi = el("div", "editor-comandi");
   const usa = el("button", "primario", "Usa questo ritmo");
@@ -1106,7 +1108,7 @@ function finestraRitmo(battendo = false) {
   comandi.append(usa, salvaCanto, togli, chiudi);
   box.append(comandi);
 
-  const mostra = () => { numero.value = bpm; };
+  const mostra = () => { numero.value = bpm; suTastiera.textContent = testoTempoTastiera(bpm); };
   const cambia = v => { bpm = Math.max(30, Math.min(300, Math.round(v) || bpm)); mostra(); };
   meno.onclick = () => cambia(bpm - 1);
   piu.onclick = () => cambia(bpm + 1);
