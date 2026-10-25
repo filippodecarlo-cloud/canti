@@ -67,7 +67,11 @@
         <button id="su" title="Alza di un semitono (tasto +)">+</button>
         <button id="azzera" title="Tonalità originale">↺</button>
       </div>
-      <button id="metronomo" class="metronomo" aria-pressed="false">♩</button>
+      <div class="gruppo gruppo-ritmo" role="group" aria-label="Ritmo e metronomo">
+        <button id="ritmo" title="Imposta il ritmo">♩</button>
+        <button id="batti-tempo" title="Batti il tempo per trovare il ritmo">👆</button>
+        <button id="metronomo" aria-pressed="false" title="Metronomo">▶</button>
+      </div>
       <button id="altri" class="solo-compatto" aria-expanded="false" aria-controls="altri-comandi" title="Altri comandi: dimensione del testo, accordi, modifica, scaletta, colori">⋯</button>
       <div id="altri-comandi" class="altri-comandi">
       <div class="gruppo" role="group" aria-label="Dimensione testo">
@@ -78,7 +82,6 @@
         <button id="accordi" aria-pressed="true" title="Mostra o nascondi gli accordi">Accordi</button>
         <button id="notazione" title="Notazione italiana o internazionale">Do / C</button>
         <button id="modifica-canto" class="solo-online" title="Modifica il canto (serve la password)">✎ Modifica</button>
-        <button id="batti-tempo" title="Batti il tempo per trovare il ritmo del canto">👆 Batti il tempo</button>
         <button id="in-scaletta" title="Aggiungi questo canto a una scaletta">+ Scaletta</button>
         <select id="tema" title="Colori" aria-label="Colori">
           <option value="">Colori automatici</option>

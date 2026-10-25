@@ -463,8 +463,9 @@ body.in-modifica #in-scaletta { display: none; }
 @media print { #altri { display: none !important; } .altri-comandi { display: contents !important; } }
 
 /* --- metronomo: la cornice della pagina si accende a tempo --------------- */
-#metronomo { min-width: 44px; font-size: 15px; font-variant-numeric: tabular-nums; }
-#metronomo.senza-ritmo[aria-pressed] { color: var(--tenue); opacity: .6; }
+#ritmo { min-width: 64px; font-variant-numeric: tabular-nums; }
+#ritmo.senza-ritmo { color: var(--tenue); }
+#metronomo, #batti-tempo { min-width: 40px; }
 #metronomo[aria-pressed="true"] { background: var(--rubrica); border-color: var(--rubrica); color: var(--carta); text-decoration: none; }
 #metronomo[aria-pressed="false"] { text-decoration: none; color: var(--inchiostro); }
 .battito {
@@ -476,14 +477,13 @@ body.metronomo .battito { display: block; }
 .battito.colpo.primo { animation-name: battito-primo; }
 @keyframes battito { from { border-color: color-mix(in srgb, var(--rubrica) 55%, transparent); } to { border-color: transparent; } }
 @keyframes battito-primo { from { border-color: var(--rubrica); } to { border-color: transparent; } }
-@media (max-width: 1100px) { #metronomo { order: 3; } }
 @media print { #metronomo, .battito { display: none !important; } }
 
 /* --- batti il tempo ------------------------------------------------------ */
 .batti-tempo { max-width: 380px; }
 .batti-pad {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  width: 100%; height: 180px; margin: 12px 0; border-radius: 16px;
+  width: 100%; height: 130px; margin: 12px 0; border-radius: 16px;
   border: 2px dashed var(--linea); background: var(--pannello);
   touch-action: manipulation; user-select: none; -webkit-user-select: none;
 }
@@ -493,3 +493,12 @@ body.metronomo .battito { display: block; }
 @keyframes batti-pad { from { border-color: var(--rubrica); background: color-mix(in srgb, var(--rubrica) 12%, var(--pannello)); } }
 .batti-tempo .editor-comandi { flex-wrap: wrap; }
 .editor-tempo .batti { min-height: 32px; padding: 2px 10px; font-size: 14px; touch-action: manipulation; }
+.ritmo-mano { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 6px 0 0; }
+.ritmo-mano button { min-width: 48px; min-height: 44px; font-size: 22px; }
+.ritmo-nota { font-size: 22px; color: var(--tenue); }
+dialog#finestra .ritmo-mano input {
+  width: 96px; margin: 0; font-size: 34px; font-weight: 700; text-align: center; color: var(--rubrica);
+  font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+}
+.ritmo-mano input::-webkit-inner-spin-button, .ritmo-mano input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.batti-pad small { font-size: 15px; }

@@ -271,7 +271,7 @@ function abcDaMelodia(mel) {
 }
 
 /** Testo di un blocco melodia (in uno dei tre formati) -> ABC pronto da disegnare. */
-function abcDaSorgente(sorgente, canto) {
+function abcDaSorgente(sorgente, canto, ritmo = 0) {
   const abc = /\{\s*(?:start_of_abc|soa)\s*\}([\s\S]*?)(?:\{\s*(?:end_of_abc|eoa)\s*\}|$)/i.exec(sorgente);
   if (abc) return { abc: abc[1].trim(), errori: [], tonalita: "", haTempo: /^Q:/m.test(abc[1]) };
 
@@ -287,6 +287,7 @@ function abcDaSorgente(sorgente, canto) {
   if (!mel.tonalita && canto) mel.tonalita = tonalitaEstesa(canto.meta.key);
   if (!mel.metro && canto) mel.metro = canto.meta.metro;
   if (!mel.bpm && canto) mel.bpm = canto.meta.bpm;
+  if (ritmo) mel.bpm = String(ritmo);  // ritmo scelto su questo dispositivo
   return { ...abcDaMelodia(mel), tonalita: mel.tonalita, haTempo: !!mel.bpm };
 }
 
@@ -708,7 +709,8 @@ function intestazione(canto) {
   $("titolo").textContent = m.title;
   $("sottotitolo").textContent = m.subtitle;
   $("autore").textContent = m.artist;
-  $("tempo-canto").textContent = [m.metro, m.bpm && `♩ = ${m.bpm}`].filter(Boolean).join(" · ");
+  const bpm = stato.ritmo[canto.id] || m.bpm;
+  $("tempo-canto").textContent = [m.metro, bpm && `♩ = ${bpm}`].filter(Boolean).join(" · ");
   const yt = $("youtube");
   yt.hidden = !m.youtube;
   if (m.youtube) yt.href = /^https?:\/\//.test(m.youtube) ? m.youtube : "https://www.youtube.com/watch?v=" + m.youtube;
@@ -767,7 +769,7 @@ function disegna() {
     } else if (b.tipo === "commento") {
       corpo.append(el("p", "commento", b.testo));
     } else if (b.tipo === "melodia") {
-      corpo.append(disegnaMelodia(b.sorgente, canto, n, bemolli));
+      corpo.append(disegnaMelodia(b.sorgente, canto, n, bemolli, false, stato.ritmo[canto.id]));
     }
   }
 
@@ -861,7 +863,7 @@ function fermaAudio() {
   if (synthAttivo) { synthAttivo.synth.stop(); synthAttivo.fine(); synthAttivo = null; }
 }
 
-function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false) {
+function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false, ritmo = 0) {
   const box = el("section", "melodia");
   const testa = el("div", "melodia-testa");
   const etichetta = el("span", "melodia-titolo");
@@ -872,7 +874,8 @@ function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false) {
 
   let visual = null, risultato = null, traspAttuale = n;
   const rendi = (testo, trasp) => {
-    risultato = abcDaSorgente(testo, canto);
+    // il ritmo del dispositivo vale per la melodia così com'è, non mentre la si riscrive
+    risultato = abcDaSorgente(testo, canto, testo === sorgente ? ritmo : 0);
     traspAttuale = trasp;
     const r = risultato;
     const ton = trasponiNomeTonalita(r.tonalita, trasp);
@@ -1007,12 +1010,14 @@ function battitiPerMisura(metro) {
 function aggiornaMetronomo() {
   const canto = stato.corrente;
   const { bpm, metro } = canto ? tempoMetronomo(canto) : { bpm: 0 };
-  const b = $("metronomo");
-  b.textContent = "♩" + (bpm ? " " + bpm : "");
-  b.classList.toggle("senza-ritmo", !bpm);
+  const r = $("ritmo"), b = $("metronomo");
+  r.textContent = "♩ " + (bpm || "–");
+  r.classList.toggle("senza-ritmo", !bpm);
+  r.title = bpm ? `Ritmo ♩ = ${bpm}: tocca per cambiarlo` : "Imposta il ritmo del canto";
+  b.textContent = metronomo.acceso && bpm ? "■" : "▶";
   b.setAttribute("aria-pressed", metronomo.acceso && !!bpm);
-  b.title = !bpm ? "Metronomo: questo canto non ha il ritmo (si imposta in ✎ Modifica)"
-    : metronomo.acceso ? "Ferma il metronomo" : `Metronomo: la cornice batte il tempo (♩ = ${bpm}${metro ? ", " + metro : ""})`;
+  b.title = metronomo.acceso && bpm ? "Ferma il metronomo"
+    : `Metronomo: la cornice batte il tempo${bpm ? ` (♩ = ${bpm}${metro ? ", " + metro : ""})` : ""}`;
   clearTimeout(metronomo.timer);
   document.body.classList.toggle("metronomo", metronomo.acceso && !!bpm);
   if (!metronomo.acceso || !bpm) return;
@@ -1033,8 +1038,10 @@ function aggiornaMetronomo() {
 }
 
 $("metronomo").onclick = () => {
+  // senza ritmo prima lo si sceglie (a mano o battendo): il metronomo parte con «Usa questo ritmo»
   if (stato.corrente && !tempoMetronomo(stato.corrente).bpm) {
-    avviso("Questo canto non ha il ritmo: impostalo in ✎ Modifica (ritmo = battiti al minuto).");
+    metronomo.acceso = true;
+    finestraRitmo(false);
     return;
   }
   metronomo.acceso = !metronomo.acceso;
@@ -1060,73 +1067,83 @@ function contaBattiti() {
   };
 }
 
-/** Finestra per battere il tempo di una canzone che si sente o si ha in mente. */
-function finestraBatti() {
+/** Finestra del ritmo: si scrive a mano (− numero +) o si batte a tempo sul riquadro. */
+function finestraRitmo(battendo = false) {
   const canto = stato.corrente;
   if (!canto) return;
   const d = $("finestra");
   const box = el("div", "batti-tempo");
-  const delCanto = canto.meta.bpm || (tempoMetronomo({ ...canto, id: "" }).bpm || "");
-  box.append(el("h3", null, "Batti il tempo"));
-  box.append(el("p", "finestra-testo", "Tocca il riquadro a tempo con la musica (o premi un tasto qualsiasi). " +
-    "Dopo tre tocchi compare il ritmo; se ti fermi due secondi si ricomincia."));
+  const delCanto = parseInt(canto.meta.bpm, 10) || tempoMetronomo({ ...canto, id: "" }).bpm || 0;
+  let bpm = tempoMetronomo(canto).bpm || delCanto || BPM_PREDEFINITO;
+  box.append(el("h3", null, "Ritmo"));
+
+  // a mano: − numero +
+  const riga = el("div", "ritmo-mano");
+  const meno = el("button", null, "−"), piu = el("button", null, "+");
+  const numero = el("input");
+  Object.assign(numero, { type: "number", min: 30, max: 300, step: 1, inputMode: "numeric" });
+  numero.setAttribute("aria-label", "Battiti al minuto");
+  riga.append(meno, el("span", "ritmo-nota", "♩ ="), numero, piu);
+  box.append(riga);
+
+  // battendo: il riquadro da toccare a tempo
   const pad = el("button", "batti-pad");
-  pad.type = "button";
-  const numero = el("b", null, "–");
-  const sotto = el("small", null, "tocca qui");
-  pad.append(numero, sotto);
+  const sotto = el("small", null, "👆 tocca qui a tempo con la musica");
+  pad.append(sotto);
   box.append(pad);
-  const info = el("p", "finestra-testo");
-  const aggiornaInfo = () => {
-    const qui = stato.ritmo[canto.id];
-    info.textContent = `Ritmo del canto: ${delCanto ? "♩ = " + delCanto : "non impostato"}` +
-      (qui ? ` · su questo dispositivo: ♩ = ${qui}` : "");
-  };
-  aggiornaInfo();
-  box.append(info);
-  const conta = contaBattiti();
-  let bpm = 0;
+  box.append(el("p", "finestra-testo", "Dopo tre tocchi il ritmo si scrive da solo; se ti fermi due secondi si ricomincia. " +
+    `Ritmo salvato nel canto: ${delCanto ? "♩ = " + delCanto : "nessuno"}.`));
+
   const comandi = el("div", "editor-comandi");
-  const usa = el("button", "primario", "Usa nel metronomo");
+  const usa = el("button", "primario", "Usa questo ritmo");
   const salvaCanto = el("button", "solo-online", "Salva nel canto…");
-  const togli = el("button", null, "Torna al ritmo del canto");
-  const chiudi = el("button", null, "Chiudi");
-  usa.title = "Il metronomo usa questo ritmo, su questo dispositivo";
+  const togli = el("button", null, `Torna a ♩ = ${delCanto}`);
+  const chiudi = el("button", null, "Annulla");
+  usa.title = "Vale per il metronomo e per il pentagramma, su questo dispositivo";
   salvaCanto.title = "Apre ✎ Modifica con questo ritmo già scritto: poi Salva online (serve la password)";
-  for (const b of [usa, salvaCanto, togli, chiudi]) b.type = "button";
-  usa.disabled = salvaCanto.disabled = true;
-  togli.hidden = !stato.ritmo[canto.id];
+  for (const b of [meno, piu, pad, usa, salvaCanto, togli, chiudi]) b.type = "button";
+  togli.hidden = !stato.ritmo[canto.id] || !delCanto;
   comandi.append(usa, salvaCanto, togli, chiudi);
   box.append(comandi);
 
+  const mostra = () => { numero.value = bpm; };
+  const cambia = v => { bpm = Math.max(30, Math.min(300, Math.round(v) || bpm)); mostra(); };
+  meno.onclick = () => cambia(bpm - 1);
+  piu.onclick = () => cambia(bpm + 1);
+  numero.onchange = () => cambia(Number(numero.value));
+  const conta = contaBattiti();
   const tocco = () => {
-    bpm = conta.tocca();
-    numero.textContent = bpm || "…";
-    sotto.textContent = bpm ? "battiti al minuto" : `${conta.tocchi} ${conta.tocchi === 1 ? "tocco" : "tocchi"}`;
+    const b = conta.tocca();
+    if (b) cambia(b);
+    sotto.textContent = b ? "👆 continua a toccare per affinare" : `👆 ${conta.tocchi} ${conta.tocchi === 1 ? "tocco" : "tocchi"}…`;
     pad.classList.remove("colpo");
     void pad.offsetWidth;
     pad.classList.add("colpo");
-    usa.disabled = salvaCanto.disabled = !bpm;
   };
   pad.onpointerdown = e => { e.preventDefault(); tocco(); };
   pad.onclick = e => { if (e.detail === 0) tocco(); };  // Invio/spazio sul riquadro
+  // qualsiasi tasto batte il tempo, tranne mentre si scrive il numero o si usano i pulsanti
   const tasti = e => {
-    if (e.key === "Escape" || e.key === "Tab" || e.target.tagName === "BUTTON" && e.target !== pad) return;
-    if (e.repeat) return;
+    if (["Escape", "Tab", "Enter"].includes(e.key) || e.repeat || e.target === numero) return;
+    if (e.target.tagName === "BUTTON" && e.target !== pad) return;
     e.preventDefault();
     tocco();
   };
   d.addEventListener("keydown", tasti);
   const fine = () => { d.removeEventListener("keydown", tasti); if (d.open) d.close(); };
-  usa.onclick = () => {
-    stato.ritmo[canto.id] = bpm;
+  const applica = valore => {
+    if (valore && valore !== delCanto) stato.ritmo[canto.id] = valore;
+    else delete stato.ritmo[canto.id];
     salva();
-    metronomo.acceso = true;
     fine();
+    disegna();  // il pentagramma mostra lo stesso ritmo del metronomo
+    intestazione(canto);
     aggiornaMetronomo();
-    avviso(`Metronomo a ♩ = ${bpm} per questo canto, su questo dispositivo.`);
   };
+  usa.onclick = () => { cambia(Number(numero.value)); applica(bpm); };
+  togli.onclick = () => applica(0);
   salvaCanto.onclick = async () => {
+    cambia(Number(numero.value));
     fine();
     const scelto = bpm;
     await modificaCanto(canto);
@@ -1136,24 +1153,22 @@ function finestraBatti() {
     const t = blocco ? leggiTempoMelodia(blocco) : leggiTempoCanto(area.value);
     t.bpm = String(scelto);
     area.value = blocco ? area.value.replace(blocco, () => scriviTempoMelodia(blocco, t)) : scriviTempoCanto(area.value, t);
+    delete stato.ritmo[canto.id];  // salvato nel canto: quello del dispositivo non serve più
+    salva();
     anteprima();
     avviso(`Ritmo ♩ = ${scelto} scritto nel canto: premi «Salva online» per salvarlo per tutti.`);
-  };
-  togli.onclick = () => {
-    delete stato.ritmo[canto.id];
-    salva();
-    fine();
-    aggiornaMetronomo();
   };
   chiudi.onclick = fine;
   d.oncancel = () => d.removeEventListener("keydown", tasti);
   d.onclose = () => d.removeEventListener("keydown", tasti);
+  mostra();
   d.replaceChildren(box);
   d.showModal();
-  pad.focus();
+  (battendo ? pad : numero).focus();
 }
 
-$("batti-tempo").onclick = finestraBatti;
+$("ritmo").onclick = () => finestraRitmo(false);
+$("batti-tempo").onclick = () => finestraRitmo(true);
 
 /* ===== Scorrimento automatico =========================================== */
 
