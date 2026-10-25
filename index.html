@@ -67,6 +67,7 @@
         <button id="su" title="Alza di un semitono (tasto +)">+</button>
         <button id="azzera" title="Tonalità originale">↺</button>
       </div>
+      <button id="metronomo" class="metronomo" aria-pressed="false">♩</button>
       <button id="altri" class="solo-compatto" aria-expanded="false" aria-controls="altri-comandi" title="Altri comandi: dimensione del testo, accordi, modifica, scaletta, colori">⋯</button>
       <div id="altri-comandi" class="altri-comandi">
       <div class="gruppo" role="group" aria-label="Dimensione testo">
@@ -177,6 +178,7 @@ testo: A-gnel-lo di Dio
     </form>
   </div>
 </section>
+<div id="battito" class="battito" aria-hidden="true"></div>
 <dialog id="finestra"></dialog>
 <div id="avviso" class="avviso" role="status" hidden></div>
 

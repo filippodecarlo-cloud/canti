@@ -314,7 +314,13 @@ function leggiChordPro(testo, file) {
     const riga = grezza.trimEnd();
     if (raccolta) {
       raccolta.righe.push(riga);
-      if (raccolta.fine.test(riga)) { blocchi.push({ tipo: "melodia", sorgente: raccolta.righe.join("\n") }); raccolta = null; }
+      if (raccolta.fine.test(riga)) {
+        const sorgente = raccolta.righe.join("\n");
+        // il modello con le righe ancora vuote non disegna un pentagramma vuoto
+        const vuota = /^\{\s*start_of_melodia/i.test(sorgente) && !/^[ \t]*note[ \t]*:[ \t]*\S/im.test(sorgente);
+        blocchi.push({ tipo: vuota ? "melodia-vuota" : "melodia", sorgente });
+        raccolta = null;
+      }
       continue;
     }
     const d = /^\{\s*([\w_]+)\s*(?::\s*(.*?))?\s*\}$/.exec(riga);
@@ -682,6 +688,7 @@ function mostraCanto(canto) {
   disegnaTag();
   disegna();
   aggiornaScorrimento();
+  aggiornaMetronomo();
   window.scrollTo(0, 0);
 }
 
@@ -960,6 +967,68 @@ function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false) {
   if (apriEditor) apri();
   return box;
 }
+
+/* ===== Metronomo ========================================================= */
+
+// Acceso, la cornice della pagina si illumina a ogni battito; il primo della battuta è più forte.
+// Resta acceso passando da un canto all'altro e batte solo nei canti che hanno il ritmo.
+const metronomo = { acceso: false, timer: null, bpm: 0, battiti: 4 };
+
+/** Misura e battiti al minuto del canto: dall'intestazione o, se mancano, dalla melodia. */
+function tempoMetronomo(canto) {
+  const t = { metro: canto.meta.metro, bpm: canto.meta.bpm };
+  for (const b of canto.blocchi) {
+    if (!/^melodia/.test(b.tipo) || !/start_of_melodia/i.test(b.sorgente)) continue;
+    const m = leggiTempoMelodia(b.sorgente);
+    t.metro = t.metro || m.metro;
+    t.bpm = t.bpm || m.bpm;
+  }
+  return { bpm: Math.min(300, parseInt(t.bpm, 10) || 0), metro: t.metro };
+}
+
+/** 4/4 -> 4 battiti; 6/8, 9/8, 12/8 si battono a gruppi di tre (2, 3, 4). */
+function battitiPerMisura(metro) {
+  const [num, den] = (metro || "4/4").split("/").map(Number);
+  if (!num) return 4;
+  return den === 8 && num > 3 && num % 3 === 0 ? num / 3 : num;
+}
+
+function aggiornaMetronomo() {
+  const canto = stato.corrente;
+  const { bpm, metro } = canto ? tempoMetronomo(canto) : { bpm: 0 };
+  const b = $("metronomo");
+  b.textContent = "♩" + (bpm ? " " + bpm : "");
+  b.classList.toggle("senza-ritmo", !bpm);
+  b.setAttribute("aria-pressed", metronomo.acceso && !!bpm);
+  b.title = !bpm ? "Metronomo: questo canto non ha il ritmo (si imposta in ✎ Modifica)"
+    : metronomo.acceso ? "Ferma il metronomo" : `Metronomo: la cornice batte il tempo (♩ = ${bpm}${metro ? ", " + metro : ""})`;
+  clearTimeout(metronomo.timer);
+  document.body.classList.toggle("metronomo", metronomo.acceso && !!bpm);
+  if (!metronomo.acceso || !bpm) return;
+  Object.assign(metronomo, { bpm, battiti: battitiPerMisura(metro) });
+  // ogni battito è calcolato dall'inizio, così il tempo non scivola con i ritardi del timer
+  const inizio = performance.now(), passo = 60000 / bpm;
+  let n = 0;
+  const batti = () => {
+    const cornice = $("battito");
+    cornice.classList.remove("colpo", "primo");
+    void cornice.offsetWidth;  // fa ripartire l'animazione
+    cornice.classList.add("colpo");
+    if (n % metronomo.battiti === 0) cornice.classList.add("primo");
+    n++;
+    metronomo.timer = setTimeout(batti, Math.max(0, inizio + n * passo - performance.now()));
+  };
+  batti();
+}
+
+$("metronomo").onclick = () => {
+  if (stato.corrente && !tempoMetronomo(stato.corrente).bpm) {
+    avviso("Questo canto non ha il ritmo: impostalo in ✎ Modifica (ritmo = battiti al minuto).");
+    return;
+  }
+  metronomo.acceso = !metronomo.acceso;
+  aggiornaMetronomo();
+};
 
 /* ===== Scorrimento automatico =========================================== */
 
@@ -1345,7 +1414,8 @@ async function modificaCanto(canto) {
   document.body.classList.add("in-modifica");
   anteprima();
   // il cursore parte dalle note della melodia (o dall'inizio), non dalla fine del testo
-  const inizio = Math.max(0, area.value.search(/^note:/m));
+  const note = /^note:[ \t]*/m.exec(area.value);
+  const inizio = note ? note.index + note[0].length : 0;
   area.setSelectionRange(inizio, inizio);
   area.scrollTop = 0;
   area.focus();
@@ -1358,6 +1428,7 @@ function anteprima() {
   intestazione(canto);
   disegnaTag();
   disegna();
+  aggiornaMetronomo();
   disegnaTagEditor();
   // la melodia sta subito sopra il testo: si scrive e si ascolta senza scorrere la pagina
   const melodie = $("pm-melodia");
