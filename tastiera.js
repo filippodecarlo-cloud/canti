@@ -364,27 +364,63 @@ function noteAccordo(testo) {
   return note;
 }
 
-const piano = { da: 48, ottave: 2, attive: new Map(), accordo: [] };
+// i 52 tasti bianchi, da A-1 a C7: il pianoforte mostra quelli da piano.da in poi
+const BIANCHI_88 = [];
+for (let p = 9; p <= 96; p++) if (!TASTI_EN[p % 12].includes("#")) BIANCHI_88.push(p);
+/** Indice del tasto bianco su cui cade (o subito sotto cui cade) una nota. */
+const biancoSotto = p => BIANCHI_88.findLastIndex(b => b <= p);
+
+const piano = { da: BIANCHI_88.indexOf(48), n: 15, attive: new Map(), accordo: [] };
+
+function spostaPiano(passi) {
+  piano.da = Math.max(0, Math.min(BIANCHI_88.length - piano.n, piano.da + passi));
+  disegnaPianoforte();
+}
 
 function costruisciPianoforte() {
   const box = el("section", "pianoforte");
   box.id = "pianoforte";
   box.hidden = true;
   const barra = el("div", "pianoforte-barra");
-  const giu = el("button", null, "◀");
-  const su = el("button", null, "▶");
+  const comandi = [["«", -7, "Un'ottava più in basso"], ["‹", -1, "Un tasto più in basso"],
+    ["›", 1, "Un tasto più in alto"], ["»", 7, "Un'ottava più in alto"]].map(([testo, passi, titolo]) => {
+    const b = el("button", null, testo);
+    b.title = titolo;
+    b.onclick = () => spostaPiano(passi);
+    return b;
+  });
   const gamma = el("span", "pianoforte-gamma");
   const nomeAcc = el("span", "pianoforte-accordo");
   const chiudi = el("button", null, "×");
-  giu.title = "Un'ottava più in basso";
-  su.title = "Un'ottava più in alto";
   chiudi.title = "Chiudi il pianoforte";
-  barra.append(giu, gamma, su, nomeAcc, chiudi);
+  barra.append(comandi[0], comandi[1], gamma, comandi[2], comandi[3], nomeAcc, chiudi);
+  // tutta la tastiera in miniatura: il riquadro è la parte visibile, si trascina col dito
+  const mappa = el("div", "pianoforte-mappa");
+  BIANCHI_88.forEach(p => {
+    const s = el("span", "fascia-" + ((Math.floor(p / 12) + 1) % 2));
+    if (p % 12 === 0) s.textContent = Math.floor(p / 12) - 1;
+    mappa.append(s);
+  });
+  const finestra = el("div", "pianoforte-finestra");
+  mappa.append(finestra);
+  mappa.title = "Trascina per spostarti sulla tastiera";
+  const segui = e => {
+    const r = mappa.getBoundingClientRect();
+    const i = Math.floor((e.clientX - r.left) / r.width * BIANCHI_88.length);
+    spostaPiano(i - Math.floor(piano.n / 2) - piano.da);
+  };
+  let trascina = null;
+  mappa.onpointerdown = e => {
+    e.preventDefault();
+    trascina = e.pointerId;
+    try { mappa.setPointerCapture(e.pointerId); } catch { /* senza cattura si segue solo sopra la striscia */ }
+    segui(e);
+  };
+  mappa.onpointermove = e => { if (e.pointerId === trascina) segui(e); };
+  mappa.onpointerup = mappa.onpointercancel = () => { trascina = null; };
   const tasti = el("div", "pianoforte-tasti");
-  box.append(barra, tasti);
+  box.append(barra, mappa, tasti);
   document.body.append(box);
-  giu.onclick = () => { piano.da = Math.max(12, piano.da - 12); disegnaPianoforte(); };
-  su.onclick = () => { piano.da = Math.min(96 - piano.ottave * 12, piano.da + 12); disegnaPianoforte(); };
   chiudi.onclick = () => mostraPianoforte(false);
   return box;
 }
@@ -392,16 +428,18 @@ function costruisciPianoforte() {
 function disegnaPianoforte() {
   const box = $("pianoforte") || costruisciPianoforte();
   const tasti = box.querySelector(".pianoforte-tasti");
-  // quanti tasti bianchi stanno nella larghezza: almeno un'ottava, tasti di almeno 34 px
-  piano.ottave = Math.max(1, Math.min(4, Math.floor((box.clientWidth || innerWidth) / (7 * 34))));
-  piano.da = Math.min(piano.da, 96 - piano.ottave * 12);
-  const a = piano.da + piano.ottave * 12;  // compreso il Do finale
-  box.querySelector(".pianoforte-gamma").textContent = `${nomeTasto(nomeDaPos(piano.da))} – ${nomeTasto(nomeDaPos(a))}`;
+  // quanti tasti bianchi stanno nella larghezza, ognuno di almeno 34 px
+  piano.n = Math.max(7, Math.min(36, Math.floor((box.clientWidth || innerWidth) / 34)));
+  piano.da = Math.max(0, Math.min(BIANCHI_88.length - piano.n, piano.da));
+  const bianchi = BIANCHI_88.slice(piano.da, piano.da + piano.n);
+  const da = bianchi[0], a = bianchi[bianchi.length - 1];
+  box.querySelector(".pianoforte-gamma").textContent = `${nomeTasto(nomeDaPos(da))} – ${nomeTasto(nomeDaPos(a))}`;
+  Object.assign(box.querySelector(".pianoforte-finestra").style, {
+    left: `${piano.da / BIANCHI_88.length * 100}%`, width: `${piano.n / BIANCHI_88.length * 100}%`,
+  });
   tasti.replaceChildren();
-  const bianchi = [];
-  for (let p = piano.da; p <= a; p++) if (!TASTI_EN[p % 12].includes("#")) bianchi.push(p);
   const larghezza = 100 / bianchi.length;
-  for (let p = piano.da; p <= a; p++) {
+  for (let p = da; p <= a; p++) {
     const nero = TASTI_EN[p % 12].includes("#");
     const t = el("div", nero ? "tasto nero" : "tasto bianco");
     t.dataset.p = p;
@@ -444,8 +482,8 @@ function provaAccordo(testo) {
   if (!note) return;
   piano.accordo = note;
   // l'accordo deve stare nella parte visibile della tastiera
-  const minimo = Math.min(...note);
-  if (minimo < piano.da || Math.max(...note) > piano.da + piano.ottave * 12) piano.da = minimo - (minimo % 12);
+  const primo = biancoSotto(Math.min(...note)), ultimo = biancoSotto(Math.max(...note));
+  if (primo < piano.da || ultimo >= piano.da + piano.n) piano.da = primo - 1;
   disegnaPianoforte();
   $("pianoforte").querySelector(".pianoforte-accordo").textContent = testo;
   note.forEach((p, i) => setTimeout(() => { const s = suonaNota(p, .22); setTimeout(() => s.ferma(), 1600); }, i * 35));
