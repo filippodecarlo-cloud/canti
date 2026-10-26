@@ -1597,6 +1597,7 @@ async function modificaCanto(canto) {
   // la melodia nel formato rapido del PDF diventa il blocco completo, quello della guida
   area.value = canto ? testoDi(canto.id).replace(/^\{\s*melodia_note\s*:[^}]*\}[ \t]*$/gim, m => bloccoDaTrattini(m))
     : MODELLO;
+  inModifica.chiave = chiaveDelTesto(area.value);
   $("pm-elimina").hidden = !canto;
   $("pannello-modifica").hidden = false;
   document.body.classList.add("in-modifica");
@@ -1623,33 +1624,65 @@ function anteprima() {
   melodie.replaceChildren(...canto.blocchi.filter(b => b.tipo === "melodia")
     .map(b => disegnaMelodia(b.sorgente, canto, 0, false)));
   tempoEditor.imposta(leggiTempoCanto($("pm-testo").value));
-  // tonalità con cui il canto si aprirà per tutti
-  const base = canto.meta.trasposizione || 0;
-  $("pm-ton").textContent = nomeTonalita(canto, base) + (base ? ` (${base > 0 ? "+" : ""}${base})` : " (originale)");
-  const qui = inModifica.id ? stato.trasp[inModifica.id] : undefined;
+  // la tonalità del canto per tutti: quella di {key}
+  const prima = inModifica.originale ? inModifica.originale.meta.key : "";
+  const ora = canto.meta.key;
+  $("pm-ton").textContent = (ora || "–") + (prima && ora !== prima ? ` (prima: ${prima})` : "");
+  const qui = inModifica.originale ? trasposizioneDi(inModifica.originale, true) : 0;
   const attuale = $("pm-ton-attuale");
-  attuale.hidden = qui === undefined || qui === base;
-  if (!attuale.hidden) attuale.textContent = `Usa quella di questo dispositivo: ${nomeTonalita(canto, qui)}`;
+  attuale.hidden = !qui;
+  if (qui) attuale.textContent = `Usa quella di questo dispositivo: ${nomeTonalita(inModifica.originale, qui)}`;
 }
 
-/* --- nell'editor: la tonalità con cui il canto si apre per tutti, riga {transpose: …} --- */
+/* --- nell'editor: la tonalità è una sola, {key}; cambiandola si traspone tutto il canto --- */
 
-function conTrasposizione(testo, n) {
-  const re = /^\{(?:transpose|trasposizione):.*\}$/im;
-  if (!n) return testo.replace(/^\{(?:transpose|trasposizione):.*\}\n?/im, "");
-  const riga = `{transpose: ${n > 0 ? "+" : ""}${n}}`;
-  if (re.test(testo)) return testo.replace(re, riga);
-  return /^\{key:.*\}$/im.test(testo) ? testo.replace(/^(\{key:.*\})$/im, `$1\n${riga}`)
-    : testo.replace(/^(\{title:.*\})$/im, `$1\n${riga}`);
+const chiaveDelTesto = testo => (/^\{key:\s*(.*?)\s*\}$/im.exec(testo) || [])[1] || "";
+
+/** Traspone di d semitoni accordi, sequenze e note della melodia; {key} solo se toccaChiave.
+    I diesis o i bemolli si scelgono in base alla tonalità d'arrivo. */
+function trasponiTesto(testo, d, toccaChiave = true) {
+  const chiave = chiaveDelTesto(testo);
+  const ton = leggiTonalita(chiave);
+  if (!ton || !(d = ((d % 12) + 12) % 12)) return testo;
+  const bemolli = usaBemolli(ton, toccaChiave ? d : 0);
+  const accordo = a => trasponiAccordo(a, d, bemolli, false);
+  const nota = tok => tok.replace(/^(do|re|mi|fa|sol|la|si)([#b]?)/i, (_, n, alt) =>
+    nomeNota(semitono(maiuscola(n), alt) + d, bemolli).toLowerCase());
+  let inMelodia = false;
+  return testo.split("\n").map(riga => {
+    if (/^\{\s*start_of_melodia/i.test(riga)) inMelodia = true;
+    if (/^\{\s*end_of_melodia/i.test(riga)) inMelodia = false;
+    if (inMelodia) return riga.replace(/^(\s*note\s*:)(.*)$/i, (_, inizio, note) =>
+      inizio + note.replace(/\S+/g, tok => RE_NOTA_MEL.test(tok) && !/^p/i.test(tok) ? nota(tok) : tok));
+    if (/^\{key:/i.test(riga)) return toccaChiave ? riga.replace(/^(\{key:\s*)(.*?)(\s*\})$/i, (_, i, k, f) => i + accordo(k) + f) : riga;
+    // sequenze di soli accordi: {intro: Re La}, {musica: …}, {finale: …}, {ponte: …}, {sequenza: …}
+    const seq = /^(\{\s*(?:intro|musica|finale|ponte|sequenza)\s*:\s*)(.*?)(\s*\})$/i.exec(riga);
+    if (seq) return seq[1] + seq[2].split(/(\s+)/).map(x => /\S/.test(x) ? accordo(x) : x).join("") + seq[3];
+    if (/^\{/.test(riga)) return riga;
+    return riga.replace(/\[([^\]]+)\]/g, (_, a) => `[${accordo(a)}]`);
+  }).join("\n");
 }
 
-/** delta: semitoni in più o in meno; 0 = tonalità originale del PDF; null + valore = quella indicata. */
-function cambiaTrasposizioneEditor(delta, valore) {
+/** Nell'editor: − e + spostano la tonalità di un semitono; "Com'era" torna a quella d'apertura. */
+function trasponiEditor(d) {
   const area = $("pm-testo");
-  const base = leggiChordPro(area.value, "x").meta.trasposizione || 0;
-  const n = valore !== undefined ? valore : delta === 0 ? 0 : nelGiro(base + delta);
-  area.value = conTrasposizione(area.value, n);
+  area.value = trasponiTesto(area.value, d);
+  inModifica.chiave = chiaveDelTesto(area.value);
   anteprima();
+}
+
+/** Se si riscrive {key} (es. da Sol a Fa), accordi e melodia seguono la nuova tonalità. */
+function seguiChiave() {
+  const area = $("pm-testo");
+  const nuova = chiaveDelTesto(area.value);
+  const tn = leggiTonalita(nuova), tv = leggiTonalita(inModifica.chiave);
+  if (!tn) return;  // tonalità a metà ("F", "") : si aspetta che sia completa
+  if (tv && tn.s !== tv.s) {
+    const { selectionStart: da, selectionEnd: a } = area;
+    area.value = trasponiTesto(area.value, tn.s - tv.s, false);
+    area.setSelectionRange(da, a);
+  }
+  inModifica.chiave = nuova;
 }
 
 // tempo e ritmo nell'editor: righe {tempo} e {ritmo} in cima, valgono per tutto (melodia e metronomo)
@@ -1724,11 +1757,11 @@ async function salvaModifica() {
   const titolo = (/^\{title:\s*(.*?)\s*\}$/m.exec(testo) || [])[1];
   if (!titolo) { avviso("Manca il titolo: {title: …}"); return; }
   const id = inModifica.id || nomeFile(titolo);
-  const primaBase = (inModifica.originale && inModifica.originale.meta.trasposizione) || 0;
-  const nuovaBase = leggiChordPro(testo, id).meta.trasposizione || 0;
+  const primaChiave = inModifica.originale ? inModifica.originale.meta.key : "";
+  const nuovaChiave = chiaveDelTesto(testo);
   if (await salvaCanto(id, testo, `${inModifica.id ? "Modifica" : "Nuovo canto"}: ${titolo}`)) {
     // cambiata la tonalità per tutti: anche qui il canto riparte da quella
-    if (nuovaBase !== primaBase && id in stato.trasp) { delete stato.trasp[id]; salva(); }
+    if (nuovaChiave !== primaChiave && id in stato.trasp) { delete stato.trasp[id]; salva(); }
     chiudiModificaCanto();
     riapri(id);
   }
@@ -2086,8 +2119,8 @@ const nelGiro = n => ((n + 6) % 12 + 12) % 12 - 6;  // da -6 a +5 semitoni
 
 /** Trasposizione con cui si vede il canto: quella scelta su questo dispositivo, se c'è,
     altrimenti quella salvata nel canto ({transpose: …}). In modifica conta solo quella salvata. */
-function trasposizioneDi(canto) {
-  if (!inModifica && canto.id in stato.trasp) return stato.trasp[canto.id];
+function trasposizioneDi(canto, ancheInModifica = false) {
+  if ((!inModifica || ancheInModifica) && canto.id in stato.trasp) return stato.trasp[canto.id];
   return canto.meta.trasposizione || 0;
 }
 
@@ -2095,7 +2128,7 @@ function trasposizioneDi(canto) {
 function trasponi(delta) {
   const c = stato.corrente;
   if (!c) return;
-  if (inModifica) { cambiaTrasposizioneEditor(delta); return; }
+  if (inModifica) { if (delta) trasponiEditor(delta); return; }
   const salvata = c.meta.trasposizione || 0;
   const n = delta === 0 ? salvata : nelGiro(trasposizioneDi(c) + delta);
   if (n === salvata) delete stato.trasp[c.id];
@@ -2169,7 +2202,7 @@ window.addEventListener("hashchange", apriDaIndirizzo);
 
 $("modifica-canto").onclick = () => modificaCanto(stato.corrente);
 $("nuovo-canto").onclick = () => modificaCanto(null);
-$("pm-testo").addEventListener("input", anteprima);
+$("pm-testo").addEventListener("input", () => { seguiChiave(); anteprima(); });
 $("pm-salva").onclick = salvaModifica;
 $("pm-annulla").onclick = () => {
   const originale = inModifica && inModifica.originale;
@@ -2177,10 +2210,18 @@ $("pm-annulla").onclick = () => {
   mostraCanto(originale || null);
 };
 $("pm-elimina").onclick = eliminaCanto;
-$("pm-ton-giu").onclick = () => cambiaTrasposizioneEditor(-1);
-$("pm-ton-su").onclick = () => cambiaTrasposizioneEditor(1);
-$("pm-ton-orig").onclick = () => cambiaTrasposizioneEditor(0);
-$("pm-ton-attuale").onclick = () => cambiaTrasposizioneEditor(null, stato.trasp[inModifica.id]);
+$("pm-ton-giu").onclick = () => trasponiEditor(-1);
+$("pm-ton-su").onclick = () => trasponiEditor(1);
+// "Com'era": la tonalità che il canto aveva quando si è aperta la modifica
+$("pm-ton-orig").onclick = () => {
+  const prima = leggiTonalita(inModifica.originale ? inModifica.originale.meta.key : ""), ora = leggiTonalita(chiaveDelTesto($("pm-testo").value));
+  if (prima && ora) trasponiEditor(prima.s - ora.s);
+};
+// la tonalità scelta su questo dispositivo diventa quella per tutti
+$("pm-ton-attuale").onclick = () => {
+  const prima = leggiTonalita(inModifica.originale.meta.key), ora = leggiTonalita(chiaveDelTesto($("pm-testo").value));
+  if (prima && ora) trasponiEditor(prima.s + trasposizioneDi(inModifica.originale, true) - ora.s);
+};
 $("blocco-form").onsubmit = async e => {
   e.preventDefault();
   const chiave = chiaveDalLink($("blocco-input").value);
