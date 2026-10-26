@@ -412,6 +412,7 @@ const stato = {
   trasp: salvato.trasp || {},
   vel: salvato.vel || {},       // velocità di scorrimento per canto
   ritmo: salvato.ritmo || {},   // ritmo battuto su questo dispositivo (vale per il metronomo)
+  tagChiusi: salvato.tagChiusi, // tag del canto nascosti; se non scelto: chiusi sul telefono
   tag: salvato.tag || {},       // tag modificati nell'app (sostituiscono quelli del file)
   filtri: salvato.filtri || [], // tag selezionati nell'elenco
   dim: salvato.dim || 19,
@@ -520,7 +521,17 @@ function disegnaTag() {
   box.replaceChildren();
   if (!canto) return;
   const modificabili = !sito.attivo;
-  for (const t of ordinaTag(tagDi(canto))) {
+  const tags = ordinaTag(tagDi(canto));
+  if (!tags.length && !modificabili) return;
+  // i tag si aprono e si chiudono, per lasciare spazio al canto sul telefono
+  const aperti = stato.tagChiusi === undefined ? innerWidth > 800 : !stato.tagChiusi;
+  const interruttore = el("button", "chip chip-interruttore", aperti ? "🏷 ‹" : `🏷 Tag · ${tags.length}`);
+  interruttore.title = aperti ? "Nascondi i tag" : "Mostra i tag";
+  interruttore.setAttribute("aria-expanded", aperti);
+  interruttore.onclick = () => { stato.tagChiusi = aperti; salva(); disegnaTag(); };
+  box.append(interruttore);
+  if (!aperti) return;
+  for (const t of tags) {
     const chip = coloraTag(el("span", "chip", t), t);
     chip.title = gruppoDi(t);
     if (modificabili) {

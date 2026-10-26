@@ -574,3 +574,6 @@ body.con-pianoforte #foglio { padding-bottom: 190px; }
 body.con-pianoforte .scorri { bottom: 182px; }
 body.con-pianoforte .acc { cursor: pointer; }
 @media print { .pianoforte { display: none !important; } }
+
+/* tag del canto: si aprono e si chiudono */
+.chip-interruttore { cursor: pointer; color: var(--tenue); background: var(--pannello); }
