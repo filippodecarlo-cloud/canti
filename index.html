@@ -124,7 +124,8 @@
         <summary>Guida al formato</summary>
         <div class="pm-guida">
           <p><b>Intestazione</b>: <code>{title: …}</code> titolo, <code>{subtitle: …}</code>, <code>{artist: …}</code> autore,
-            <code>{key: Re}</code> tonalità, <code>{youtube: link}</code>, <code>{tempo: 4/4}</code> la misura, <code>{ritmo: 80}</code> i battiti al minuto, <code>{transpose: +2}</code> la tonalità con cui il canto si apre per tutti (si sceglie con «Tonalità per tutti», in cima all’editor).</p>
+            <code>{key: Re}</code> tonalità, <code>{youtube: link}</code>, <code>{tempo: 4/4}</code> la misura, <code>{ritmo: 80}</code> i battiti al minuto, <code>{transpose: +2}</code> la tonalità con cui il canto si apre per tutti (si sceglie con «Tonalità per tutti», in cima all’editor).
+            Tonalità, tempo e ritmo si scrivono solo qui e valgono per tutto: accordi, armatura del pentagramma e metronomo.</p>
           <p><b>Accordi</b>: tra quadre subito prima della sillaba, in notazione italiana: <code>[Re]Santo, [Si-]san[Sol]to</code>
             (<code>Si-</code> minore, <code>Sib7+</code>, <code>La4</code>, <code>La/Do#</code>).</p>
           <p><b>Parti</b>: strofa tra <code>{start_of_verse}</code> e <code>{end_of_verse}</code>; ritornello tra
@@ -133,16 +134,14 @@
             Indicazioni: <code>{comment: Donne}</code>.</p>
           <p><b>Melodia</b>:</p>
           <pre>{start_of_melodia}
-tonalità: Re maggiore
-tempo: 4/4
-ritmo: 80
 note: la4 re8 re re4 | p4 fa#2. |
 testo: A-gnel-lo di Dio
 {end_of_melodia}</pre>
           <p>Durata dopo la nota: <code>1</code> semibreve, <code>2</code> minima, <code>4</code> semiminima,
             <code>8</code> croma, <code>16</code> semicroma, punto per la puntata (<code>sol4.</code>); senza numero vale la
             precedente. Pausa: <code>p4</code>. Ottava: <code>'</code> sopra, <code>,</code> sotto (<code>sib,2</code>).
-            Battuta: <code>|</code>. <b>Tempo</b> è la misura (4/4, 3/4…), <b>ritmo</b> i battiti al minuto: si scelgono anche dai due comandi sotto il pentagramma, in cima all’editor.</p>
+            Battuta: <code>|</code>. L’armatura di chiave è quella della tonalità del canto (<code>{key}</code>);
+            <b>tempo</b> (la misura, 4/4, 3/4…) e <b>ritmo</b> (i battiti al minuto) si scelgono anche dai due comandi sotto il pentagramma, in cima all’editor.</p>
         </div>
       </details>
       <div class="editor-comandi">
