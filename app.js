@@ -1041,7 +1041,7 @@ $("metronomo").onclick = () => {
   // senza ritmo prima lo si sceglie (a mano o battendo): il metronomo parte con «Usa questo ritmo»
   if (stato.corrente && !tempoMetronomo(stato.corrente).bpm) {
     metronomo.acceso = true;
-    finestraRitmo(false);
+    finestraRitmo();
     return;
   }
   metronomo.acceso = !metronomo.acceso;
@@ -1068,7 +1068,7 @@ function contaBattiti() {
 }
 
 /** Finestra del ritmo: si scrive a mano (− numero +) o si batte a tempo sul riquadro. */
-function finestraRitmo(battendo = false) {
+function finestraRitmo() {
   const canto = stato.corrente;
   if (!canto) return;
   const d = $("finestra");
@@ -1166,11 +1166,10 @@ function finestraRitmo(battendo = false) {
   mostra();
   d.replaceChildren(box);
   d.showModal();
-  (battendo ? pad : numero).focus();
+  numero.focus();
 }
 
-$("ritmo").onclick = () => finestraRitmo(false);
-$("batti-tempo").onclick = () => finestraRitmo(true);
+$("ritmo").onclick = () => finestraRitmo();
 
 /* ===== Scorrimento automatico =========================================== */
 
