@@ -413,6 +413,7 @@ const stato = {
   vel: salvato.vel || {},       // velocità di scorrimento per canto
   ritmo: salvato.ritmo || {},   // ritmo battuto su questo dispositivo (vale per il metronomo)
   tagChiusi: salvato.tagChiusi, // tag del canto nascosti; se non scelto: chiusi sul telefono
+  ticchettio: !!salvato.ticchettio, // il metronomo si sente, oltre a vedersi
   tag: salvato.tag || {},       // tag modificati nell'app (sostituiscono quelli del file)
   filtri: salvato.filtri || [], // tag selezionati nell'elenco
   dim: salvato.dim || 19,
@@ -997,7 +998,7 @@ function disegnaMelodia(sorgente, canto, n, bemolli, apriEditor = false, ritmo =
 
 // Acceso, la cornice della pagina si illumina a ogni battito; il primo della battuta è più forte.
 // Resta acceso passando da un canto all'altro e batte solo nei canti che hanno il ritmo.
-const metronomo = { acceso: false, timer: null, bpm: 0, battiti: 4 };
+const metronomo = { acceso: false, timer: null, bpm: 0, battiti: 4, giro: 0, prossimo: null };
 
 /** Misura e battiti al minuto del canto: dall'intestazione o, se mancano, dalla melodia. */
 function tempoMetronomo(canto) {
@@ -1029,23 +1030,73 @@ function aggiornaMetronomo() {
   b.setAttribute("aria-pressed", metronomo.acceso && !!bpm);
   b.title = metronomo.acceso && bpm ? "Ferma il metronomo"
     : `Metronomo: la cornice batte il tempo${bpm ? ` (♩ = ${bpm}${metro ? ", " + metro : ""})` : ""}`;
+  const s = $("ticchettio");
+  s.textContent = stato.ticchettio ? "🔊" : "🔇";
+  s.setAttribute("aria-pressed", stato.ticchettio);
+  s.title = stato.ticchettio ? "Metronomo con il tic tac: tocca per toglierlo" : "Metronomo muto: tocca per sentire il tic tac";
+  const giro = ++metronomo.giro;  // se si riavvia o si ferma nel frattempo, il giro vecchio non parte
   clearTimeout(metronomo.timer);
+  // il tic già programmato per il battito successivo non deve suonare più
+  if (metronomo.prossimo) { try { metronomo.prossimo.stop(); } catch { /* già suonato */ } metronomo.prossimo = null; }
   document.body.classList.toggle("metronomo", metronomo.acceso && !!bpm);
   if (!metronomo.acceso || !bpm) return;
   Object.assign(metronomo, { bpm, battiti: battitiPerMisura(metro) });
-  // ogni battito è calcolato dall'inizio, così il tempo non scivola con i ritardi del timer
-  const inizio = performance.now(), passo = 60000 / bpm;
-  let n = 0;
-  const batti = () => {
-    const cornice = $("battito");
-    cornice.classList.remove("colpo", "primo");
-    void cornice.offsetWidth;  // fa ripartire l'animazione
-    cornice.classList.add("colpo");
-    if (n % metronomo.battiti === 0) cornice.classList.add("primo");
-    n++;
-    metronomo.timer = setTimeout(batti, Math.max(0, inizio + n * passo - performance.now()));
+  const ctx = stato.ticchettio ? contestoAudio() : null;
+  const avvia = () => {
+    if (giro !== metronomo.giro) return;
+    // ogni battito è calcolato dall'inizio, così il tempo non scivola con i ritardi del timer
+    const anticipo = 60;  // ms: il primo tic va programmato un attimo prima che suoni
+    const inizio = performance.now() + anticipo, passo = 60000 / bpm;
+    // il tic si programma un battito prima sull'orologio dell'audio, preciso al millesimo;
+    // il suono esce dagli altoparlanti con un piccolo ritardo, che si anticipa
+    const ritardo = ctx ? (ctx.outputLatency || ctx.baseLatency || 0) : 0;
+    const tic = k => {
+      if (!ctx) return;
+      const quando = ctx.currentTime + (inizio + k * passo - performance.now()) / 1000 - ritardo;
+      if (quando > ctx.currentTime) metronomo.prossimo = suonaTic(ctx, quando, k % metronomo.battiti === 0);
+    };
+    let n = 0;
+    tic(0);
+    const batti = () => {
+      const cornice = $("battito");
+      cornice.classList.remove("colpo", "primo");
+      void cornice.offsetWidth;  // fa ripartire l'animazione
+      cornice.classList.add("colpo");
+      if (n % metronomo.battiti === 0) cornice.classList.add("primo");
+      n++;
+      tic(n);
+      metronomo.timer = setTimeout(batti, Math.max(0, inizio + n * passo - performance.now()));
+    };
+    metronomo.timer = setTimeout(batti, anticipo);
   };
-  batti();
+  // appena acceso, l'orologio dell'audio resta fermo per un attimo: si parte quando cammina
+  if (ctx) orologioAudioPronto(ctx).then(avvia);
+  else avvia();
+}
+
+function orologioAudioPronto(ctx) {
+  const prima = ctx.currentTime, scadenza = performance.now() + 1000;
+  return new Promise(pronto => {
+    const prova = () => {
+      if ((ctx.state === "running" && ctx.currentTime > prima) || performance.now() > scadenza) pronto();
+      else setTimeout(prova, 15);
+    };
+    prova();
+  });
+}
+
+/** Un colpo breve all'istante dato (secondi dell'audio): più acuto e forte sul primo battito. */
+function suonaTic(ctx, quando, primo) {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = "triangle";
+  o.frequency.value = primo ? 1760 : 1175;
+  g.gain.setValueAtTime(0, quando);
+  g.gain.linearRampToValueAtTime(primo ? .5 : .3, quando + .002);
+  g.gain.exponentialRampToValueAtTime(.001, quando + .05);
+  o.connect(g).connect(ctx.destination);
+  o.start(quando);
+  o.stop(quando + .06);
+  return o;
 }
 
 $("metronomo").onclick = () => {
@@ -1057,6 +1108,12 @@ $("metronomo").onclick = () => {
   }
   metronomo.acceso = !metronomo.acceso;
   aggiornaMetronomo();
+};
+
+$("ticchettio").onclick = () => {
+  stato.ticchettio = !stato.ticchettio;
+  salva();
+  aggiornaMetronomo();  // riparte da capo, col suono o senza
 };
 
 /* ===== Batti il tempo ==================================================== */

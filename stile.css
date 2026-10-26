@@ -465,7 +465,8 @@ body.in-modifica #in-scaletta { display: none; }
 /* --- metronomo: la cornice della pagina si accende a tempo --------------- */
 #ritmo { min-width: 64px; font-variant-numeric: tabular-nums; }
 #ritmo.senza-ritmo { color: var(--tenue); }
-#metronomo { min-width: 40px; }
+#metronomo, #ticchettio { min-width: 40px; }
+#ticchettio[aria-pressed] { text-decoration: none; color: inherit; }
 #metronomo[aria-pressed="true"] { background: var(--rubrica); border-color: var(--rubrica); color: var(--carta); text-decoration: none; }
 #metronomo[aria-pressed="false"] { text-decoration: none; color: var(--inchiostro); }
 .battito {
