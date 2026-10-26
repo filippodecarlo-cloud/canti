@@ -528,3 +528,49 @@ dialog#finestra.larga { width: min(640px, calc(100vw - 24px)); max-width: none; 
 .disegno-tastiera .nome { font: 9px var(--sans); fill: var(--tenue); }
 .disegno-tastiera .nome.premi { fill: var(--rubrica); stroke: none; font-weight: 700; }
 .ritmo-tastiera { margin-top: -4px; font-size: 13px; }
+
+/* mappa di tutta la tastiera: le ottave a fasce alterne */
+.vista-tasti { margin: 2px 0 8px; }
+.mappa-tastiera { display: block; width: 100%; margin: 4px 0 2px; }
+.mappa-tastiera .tasto-bianco { fill: #fff; stroke: #999; stroke-width: .6; }
+.mappa-tastiera .tasto-nero { fill: #222; }
+.mappa-tastiera .premi { fill: var(--rubrica); stroke: var(--rubrica); }
+.mappa-tastiera .segno { fill: var(--rubrica); }
+.mappa-tastiera .fascia-0 { fill: color-mix(in srgb, var(--rubrica) 14%, var(--carta)); }
+.mappa-tastiera .fascia-1 { fill: var(--pannello); }
+.mappa-tastiera .nome-ottava { font: 700 12px var(--sans); fill: var(--inchiostro); }
+
+/* --- pianoforte per provare, in fondo alla pagina ------------------------ */
+.pianoforte {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;
+  background: var(--pannello); border-top: 1px solid var(--linea);
+  box-shadow: 0 -4px 16px rgb(0 0 0 / .1); padding: 4px 8px 8px;
+}
+.pianoforte[hidden] { display: none; }
+@media (min-width: 801px) { .pianoforte { left: 320px; } }
+.pianoforte-barra { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 13px; color: var(--tenue); }
+.pianoforte-barra button { min-height: 30px; min-width: 36px; padding: 0 8px; }
+.pianoforte-gamma { min-width: 90px; text-align: center; font-variant-numeric: tabular-nums; }
+.pianoforte-accordo { flex: 1; text-align: center; font-weight: 700; color: var(--rubrica); }
+.pianoforte-tasti {
+  position: relative; display: flex; height: 120px; touch-action: none;
+  user-select: none; -webkit-user-select: none;
+}
+.pianoforte .tasto.bianco {
+  position: relative; height: 100%; background: #fff; border: 1px solid #aaa; border-radius: 0 0 5px 5px;
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px;
+  font-size: 11px; color: #888;
+}
+.pianoforte .tasto.bianco .nome-do { color: #333; font-weight: 700; }
+.pianoforte .tasto.nero {
+  position: absolute; top: 0; z-index: 1; height: 62%;
+  transform: translateX(-50%); background: #222; border-radius: 0 0 4px 4px; border: 1px solid #111;
+}
+.pianoforte .tasto.accordo { background: color-mix(in srgb, var(--rubrica) 35%, #fff); }
+.pianoforte .tasto.nero.accordo { background: color-mix(in srgb, var(--rubrica) 75%, #222); }
+.pianoforte .tasto.giu { background: var(--rubrica); }
+.pianoforte .tasto.bianco.giu { color: #fff; }
+body.con-pianoforte #foglio { padding-bottom: 190px; }
+body.con-pianoforte .scorri { bottom: 182px; }
+body.con-pianoforte .acc { cursor: pointer; }
+@media print { .pianoforte { display: none !important; } }

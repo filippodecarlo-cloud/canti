@@ -138,6 +138,71 @@ function disegnoTastiera(tasti) {
   return svg;
 }
 
+/** Tutta la tastiera (88 tasti) con le ottave colorate a fasce: si vede subito dove cade il tasto. */
+function mappaTastiera(tasti) {
+  const pos = tasti.map(posTasto);
+  const bianco = p => !TASTI_EN[p % 12].includes("#");
+  const bianchi = [];
+  for (let p = 9; p <= 96; p++) if (bianco(p)) bianchi.push(p);
+  const L = 10, H = 40, Lb = 6, Hb = 25, T = 10, F = 17;  // F: fascia delle ottave sotto i tasti
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${bianchi.length * L + 1} ${T + H + F + 1}`);
+  svg.setAttribute("class", "mappa-tastiera");
+  svg.setAttribute("aria-hidden", "true");
+  const nuovo = (tag, attr, testo) => {
+    const e = document.createElementNS(ns, tag);
+    Object.entries(attr).forEach(([k, v]) => e.setAttribute(k, v));
+    if (testo != null) e.textContent = testo;
+    svg.append(e);
+    return e;
+  };
+  // fasce delle ottave: ogni ottava inizia da un Do; A-1 e B-1 stanno prima dell'ottava 0
+  bianchi.forEach((p, i) => {
+    const ottava = Math.floor(p / 12) - 1;
+    nuovo("rect", { x: i * L + .5, y: T + H + .5, width: L, height: F, class: "fascia-" + ((ottava + 2) % 2) });
+  });
+  bianchi.forEach((p, i) => {
+    // l'ultimo Do (C7) è il tasto più a destra: il nome va scritto verso sinistra
+    const ultimo = p === 96 ? { x: (i + 1) * L, "text-anchor": "end" } : { x: i * L + 2 };
+    if (p % 12 === 0) nuovo("text", { y: T + H + F - 4, class: "nome-ottava", ...ultimo }, nomeTasto(nomeDaPos(p)));
+  });
+  bianchi.forEach((p, i) => nuovo("rect", { x: i * L + .5, y: T + .5, width: L, height: H, class: "tasto-bianco" + (pos.includes(p) ? " premi" : "") }));
+  for (let p = 10; p <= 96; p++) {
+    if (bianco(p)) continue;
+    const i = bianchi.indexOf(p - 1);
+    nuovo("rect", { x: (i + 1) * L - Lb / 2 + .5, y: T + .5, width: Lb, height: Hb, class: "tasto-nero" + (pos.includes(p) ? " premi" : "") });
+  }
+  // un segno sopra ogni tasto da premere, visibile anche così piccolo
+  for (const p of pos) {
+    const i = bianco(p) ? bianchi.indexOf(p) + .5 : bianchi.indexOf(p - 1) + 1;
+    const x = i * L + .5;
+    nuovo("path", { d: `M${x - 4} 1 L${x + 4} 1 L${x} ${T - 1} Z`, class: "segno" });
+  }
+  return svg;
+}
+
+const ORDINALI = ["primo", "secondo", "terzo", "quarto", "quinto", "sesto", "settimo", "ottavo"];
+/** "F3" -> dove si trova, contando i Do da sinistra. */
+function doveTasto(nome) {
+  const p = posTasto(nome), ottava = Math.floor(p / 12) - 1;
+  if (ottava < 0) return `${nomeTasto(nome)}: tra i primi tre tasti a sinistra, prima del primo Do.`;
+  const doN = nomeTasto(nomeDaPos((ottava + 1) * 12));
+  const nero = TASTI_EN[p % 12].includes("#") ? " (tasto nero)" : "";
+  return `${nomeTasto(nome)}${nero}: nell'ottava che parte dal ${ORDINALI[ottava]} Do da sinistra (${doN}).`;
+}
+
+/** Quando si apre una riga: tutta la tastiera, il dettaglio ingrandito e dove cercare i tasti. */
+function vistaTasti(tasti) {
+  const box = el("div", "vista-tasti");
+  box.append(mappaTastiera(tasti), disegnoTastiera(tasti));
+  const unici = [...new Set(tasti)];
+  const p = el("p", "riga-guida-nota");
+  p.textContent = unici.slice(0, 3).map(doveTasto).join(" ");
+  box.append(p);
+  return box;
+}
+
 const pulsanti = tieni => tieni.map(p => `[${p}]`).join(" + ");
 
 /** Una riga della guida: si tocca per vedere i tasti sulla tastiera. */
@@ -153,9 +218,9 @@ function rigaGuida(nome, tieni, tasti, nota) {
   if (nota) riga.append(el("small", "riga-guida-nota", nota));
   if (tasti.length) {
     testa.onclick = () => {
-      const aperto = riga.querySelector(".disegno-tastiera");
+      const aperto = riga.querySelector(".vista-tasti");
       if (aperto) { aperto.remove(); return; }
-      riga.append(disegnoTastiera(tasti));
+      riga.append(vistaTasti(tasti));
     };
   } else testa.disabled = true;
   return riga;
@@ -227,4 +292,210 @@ function apriGuidaTastiera() {
 /** Riga per la finestra del ritmo: come impostare lo stesso tempo sulla tastiera. */
 const testoTempoTastiera = bpm => `Sulla Yamaha: tieni [METRONOME] e premi ${tastiTempo(bpm).map(nomeTasto).join(" · ")}`;
 
-$("guida-tastiera").onclick = apriGuidaTastiera;
+/* ===== Pianoforte per provare i canti ===================================== */
+
+// Suono sintetizzato nel browser: funziona anche senza connessione e risponde subito.
+const audioPiano = { ctx: null, uscita: null };
+function contestoAudio() {
+  if (!audioPiano.ctx) {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    audioPiano.ctx = new C();
+    audioPiano.uscita = audioPiano.ctx.createDynamicsCompressor();
+    audioPiano.uscita.connect(audioPiano.ctx.destination);
+  }
+  if (audioPiano.ctx.state === "suspended") audioPiano.ctx.resume();
+  return audioPiano.ctx;
+}
+
+/** Suona una nota (posizione come posTasto: C3 = 48 = Do centrale); restituisce il modo per fermarla. */
+function suonaNota(p, volume = .32) {
+  const ctx = contestoAudio();
+  if (!ctx) return { ferma() {} };
+  const f = 440 * 2 ** ((p - 57) / 12), t = ctx.currentTime;
+  const nota = ctx.createGain();
+  nota.gain.value = volume;
+  nota.connect(audioPiano.uscita);
+  // armoniche che si spengono prima delle fondamentali, come le corde di un pianoforte
+  const oscillatori = [[1, 1, 2.6], [2, .45, 1.6], [3, .22, 1], [4, .12, .7], [5, .05, .5]].map(([k, amp, durata]) => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = f * k;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(amp, t + .006);
+    g.gain.exponentialRampToValueAtTime(.0005, t + durata * (p < 48 ? 1.4 : 1));
+    o.connect(g).connect(nota);
+    o.start(t);
+    o.stop(t + 4);
+    return o;
+  });
+  return {
+    ferma() {
+      const ora = ctx.currentTime;
+      nota.gain.cancelScheduledValues(ora);
+      nota.gain.setTargetAtTime(0, ora, .07);
+      oscillatori.forEach(o => { try { o.stop(ora + .5); } catch { /* già ferma */ } });
+    },
+  };
+}
+
+/** "Sib7+", "La-/Do", "Gm7", "Do4" -> posizioni dei tasti (radice dal Do centrale, basso un'ottava sotto). */
+function noteAccordo(testo) {
+  const RAD = "(Do|Re|Mi|Fa|Sol|La|Si|[A-G])([#b]?)";
+  const m = new RegExp(`^\\(?${RAD}(.*?)(?:/${RAD}.*)?\\)?$`).exec((testo || "").trim());
+  if (!m) return null;
+  const s = (nome, alt) => semitono(LETTERE[nome] ? nome : Object.keys(LETTERE).find(k => LETTERE[k] === nome), alt);
+  const radice = s(m[1], m[2]);
+  let q = m[3];
+  let intervalli;
+  if (/^(dim|°)/.test(q)) intervalli = [0, 3, 6];
+  else if (/^(aug|\+(?!\d))/.test(q)) intervalli = [0, 4, 8];
+  else if (/^(-|m(?!aj))/.test(q)) intervalli = [0, 3, 7];
+  else if (/sus2/.test(q)) intervalli = [0, 2, 7];
+  else if (/sus|^4/.test(q)) intervalli = [0, 5, 7];
+  else intervalli = [0, 4, 7];
+  q = q.replace(/^(-|m(?!aj)|dim|°|aug)/, "");
+  if (/7\+|maj7|M7/.test(q)) intervalli.push(11);
+  else if (/7/.test(q)) intervalli.push(intervalli[2] === 6 && /dim|°/.test(m[3]) ? 9 : 10);
+  if (/6/.test(q)) intervalli.push(9);
+  if (/9/.test(q)) { if (!intervalli.includes(10) && !intervalli.includes(11)) intervalli.push(10); intervalli.push(14); }
+  const base = 48 + radice;  // nell'ottava del Do centrale
+  const note = intervalli.map(i => base + i);
+  if (m[4]) note.unshift(36 + s(m[4], m[5]));
+  return note;
+}
+
+const piano = { da: 48, ottave: 2, attive: new Map(), accordo: [] };
+
+function costruisciPianoforte() {
+  const box = el("section", "pianoforte");
+  box.id = "pianoforte";
+  box.hidden = true;
+  const barra = el("div", "pianoforte-barra");
+  const giu = el("button", null, "◀");
+  const su = el("button", null, "▶");
+  const gamma = el("span", "pianoforte-gamma");
+  const nomeAcc = el("span", "pianoforte-accordo");
+  const chiudi = el("button", null, "×");
+  giu.title = "Un'ottava più in basso";
+  su.title = "Un'ottava più in alto";
+  chiudi.title = "Chiudi il pianoforte";
+  barra.append(giu, gamma, su, nomeAcc, chiudi);
+  const tasti = el("div", "pianoforte-tasti");
+  box.append(barra, tasti);
+  document.body.append(box);
+  giu.onclick = () => { piano.da = Math.max(12, piano.da - 12); disegnaPianoforte(); };
+  su.onclick = () => { piano.da = Math.min(96 - piano.ottave * 12, piano.da + 12); disegnaPianoforte(); };
+  chiudi.onclick = () => mostraPianoforte(false);
+  return box;
+}
+
+function disegnaPianoforte() {
+  const box = $("pianoforte") || costruisciPianoforte();
+  const tasti = box.querySelector(".pianoforte-tasti");
+  // quanti tasti bianchi stanno nella larghezza: almeno un'ottava, tasti di almeno 34 px
+  piano.ottave = Math.max(1, Math.min(4, Math.floor((box.clientWidth || innerWidth) / (7 * 34))));
+  piano.da = Math.min(piano.da, 96 - piano.ottave * 12);
+  const a = piano.da + piano.ottave * 12;  // compreso il Do finale
+  box.querySelector(".pianoforte-gamma").textContent = `${nomeTasto(nomeDaPos(piano.da))} – ${nomeTasto(nomeDaPos(a))}`;
+  tasti.replaceChildren();
+  const bianchi = [];
+  for (let p = piano.da; p <= a; p++) if (!TASTI_EN[p % 12].includes("#")) bianchi.push(p);
+  const larghezza = 100 / bianchi.length;
+  for (let p = piano.da; p <= a; p++) {
+    const nero = TASTI_EN[p % 12].includes("#");
+    const t = el("div", nero ? "tasto nero" : "tasto bianco");
+    t.dataset.p = p;
+    if (nero) Object.assign(t.style, { left: `${(bianchi.indexOf(p - 1) + 1) * larghezza}%`, width: `${larghezza * .62}%` });
+    else {
+      t.style.width = `${larghezza}%`;
+      const nome = nomeTasto(nomeDaPos(p));
+      t.append(el("span", p % 12 === 0 ? "nome-do" : null, p % 12 === 0 ? nome : nome.replace(/-?\d+$/, "")));
+    }
+    if (piano.accordo.includes(p)) t.classList.add("accordo");
+    tasti.append(t);
+  }
+}
+
+function premiTasto(t, idPuntatore) {
+  const p = Number(t.dataset.p);
+  rilasciaTasto(idPuntatore);
+  piano.attive.set(idPuntatore, { t, suono: suonaNota(p) });
+  t.classList.add("giu");
+}
+function rilasciaTasto(idPuntatore) {
+  const a = piano.attive.get(idPuntatore);
+  if (!a) return;
+  a.suono.ferma();
+  a.t.classList.remove("giu");
+  piano.attive.delete(idPuntatore);
+}
+
+function mostraPianoforte(aperto) {
+  const box = $("pianoforte") || costruisciPianoforte();
+  box.hidden = !aperto;
+  document.body.classList.toggle("con-pianoforte", aperto);
+  if (aperto) disegnaPianoforte();
+  else { for (const id of [...piano.attive.keys()]) rilasciaTasto(id); }
+}
+
+/** Accordo toccato nel canto: si accende sul pianoforte e si sente. */
+function provaAccordo(testo) {
+  const note = noteAccordo(testo);
+  if (!note) return;
+  piano.accordo = note;
+  // l'accordo deve stare nella parte visibile della tastiera
+  const minimo = Math.min(...note);
+  if (minimo < piano.da || Math.max(...note) > piano.da + piano.ottave * 12) piano.da = minimo - (minimo % 12);
+  disegnaPianoforte();
+  $("pianoforte").querySelector(".pianoforte-accordo").textContent = testo;
+  note.forEach((p, i) => setTimeout(() => { const s = suonaNota(p, .22); setTimeout(() => s.ferma(), 1600); }, i * 35));
+}
+
+document.addEventListener("pointerdown", e => {
+  const t = e.target.closest && e.target.closest("#pianoforte .tasto");
+  if (!t) return;
+  e.preventDefault();
+  premiTasto(t, e.pointerId);
+});
+// scivolando col dito si passa da un tasto all'altro
+document.addEventListener("pointermove", e => {
+  const a = piano.attive.get(e.pointerId);
+  if (!a) return;
+  const sotto = document.elementFromPoint(e.clientX, e.clientY);
+  const t = sotto && sotto.closest("#pianoforte .tasto");
+  if (t && t !== a.t) premiTasto(t, e.pointerId);
+});
+for (const tipo of ["pointerup", "pointercancel"]) document.addEventListener(tipo, e => rilasciaTasto(e.pointerId));
+addEventListener("resize", () => { if (document.body.classList.contains("con-pianoforte")) disegnaPianoforte(); });
+// con il pianoforte aperto, toccando un accordo del canto lo si sente
+$("corpo").addEventListener("click", e => {
+  if (!document.body.classList.contains("con-pianoforte")) return;
+  const a = e.target.closest(".acc");
+  if (a && a.textContent.trim()) provaAccordo(a.textContent.trim());
+});
+
+/** Il pulsante 🎹 Tastiera: pianoforte per provare o istruzioni della Yamaha. */
+function sceltaTastiera() {
+  const d = $("finestra");
+  const box = el("div", "scelta-tastiera");
+  box.append(el("h3", null, "🎹 Tastiera"));
+  const aperto = document.body.classList.contains("con-pianoforte");
+  const pf = el("button", "primario", aperto ? "Chiudi il pianoforte" : "Pianoforte per provare");
+  const gd = el("button", null, "Istruzioni Yamaha P-225");
+  const no = el("button", null, "Annulla");
+  for (const b of [pf, gd, no]) b.type = "button";
+  box.append(el("p", "finestra-testo", "Il pianoforte resta in basso mentre leggi: toccando un accordo del canto lo senti e lo vedi sui tasti."));
+  const comandi = el("div", "editor-comandi");
+  comandi.append(pf, gd, no);
+  box.append(comandi);
+  pf.onclick = () => { d.close(); mostraPianoforte(!aperto); };
+  gd.onclick = () => { d.close(); apriGuidaTastiera(); };
+  no.onclick = () => d.close();
+  d.oncancel = null;
+  d.onclose = null;
+  d.replaceChildren(box);
+  d.showModal();
+  pf.focus();
+}
+
+$("guida-tastiera").onclick = sceltaTastiera;
