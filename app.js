@@ -2120,7 +2120,14 @@ const nelGiro = n => ((n + 6) % 12 + 12) % 12 - 6;  // da -6 a +5 semitoni
 /** Trasposizione con cui si vede il canto: quella scelta su questo dispositivo, se c'è,
     altrimenti quella salvata nel canto ({transpose: …}). In modifica conta solo quella salvata. */
 function trasposizioneDi(canto, ancheInModifica = false) {
-  if ((!inModifica || ancheInModifica) && canto.id in stato.trasp) return stato.trasp[canto.id];
+  if ((!inModifica || ancheInModifica) && canto.id in stato.trasp) {
+    // si ricorda anche la tonalità del canto di allora: se poi il canto viene trasposto per tutti
+    // (da un altro dispositivo), questo dispositivo resta nella tonalità che aveva scelto
+    const v = stato.trasp[canto.id];
+    if (typeof v === "number") return v;
+    const ora = leggiTonalita(canto.meta.key);
+    return ora && v.base !== undefined ? nelGiro(v.n + v.base - ora.s) : v.n;
+  }
   return canto.meta.trasposizione || 0;
 }
 
@@ -2132,7 +2139,7 @@ function trasponi(delta) {
   const salvata = c.meta.trasposizione || 0;
   const n = delta === 0 ? salvata : nelGiro(trasposizioneDi(c) + delta);
   if (n === salvata) delete stato.trasp[c.id];
-  else stato.trasp[c.id] = n;
+  else stato.trasp[c.id] = { n, base: (leggiTonalita(c.meta.key) || {}).s };
   salva();
   disegna();
 }
